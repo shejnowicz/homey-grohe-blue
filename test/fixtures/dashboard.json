@@ -1,0 +1,22 @@
+{
+  "locations": [
+    {
+      "id": "location-fixture",
+      "rooms": [
+        {
+          "id": "room-fixture",
+          "appliances": [
+            {
+              "appliance_id": "appliance-fixture",
+              "name": "Synthetic Blue Home",
+              "type": 104,
+              "config": {
+                "auto_flush_active": true
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
