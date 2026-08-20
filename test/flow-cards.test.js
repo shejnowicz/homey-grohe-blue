@@ -70,11 +70,13 @@ function createFlowHarness() {
 
   const device = new Device();
   const capabilityValues = new Map();
+  const loggedErrors = [];
   device.driver = driver;
   device.setCapabilityValue = async (capability, value) => {
     capabilityValues.set(capability, value);
   };
   device.getCapabilityValue = (capability) => capabilityValues.get(capability);
+  device.error = (error) => loggedErrors.push(error);
 
   return {
     driver,
@@ -83,6 +85,7 @@ function createFlowHarness() {
     actionCards,
     conditionCards,
     triggerCards,
+    loggedErrors,
   };
 }
 
@@ -296,4 +299,78 @@ test('missing mapped values neither trigger nor erase the previous comparison st
     harness.triggerCards.get('auto_flush_changed').triggerCalls,
     [[harness.device, { enabled: true }]],
   );
+});
+
+test('a rejected trigger is safely logged while later edges dispatch once', async () => {
+  const harness = createFlowHarness();
+  await harness.driver.onInit();
+  await harness.device.applyState({
+    autoFlush: false,
+    online: true,
+    filterPercent: 11,
+    co2Percent: 11,
+    filterLow: false,
+    co2Low: false,
+  });
+  const autoFlushCard = harness.triggerCards.get('auto_flush_changed');
+  autoFlushCard.trigger = async function trigger(...args) {
+    this.triggerCalls.push(args);
+    throw new Error('flow trigger secret');
+  };
+  const changed = {
+    autoFlush: true,
+    online: false,
+    filterPercent: 10,
+    co2Percent: 9,
+    filterLow: true,
+    co2Low: true,
+  };
+
+  await harness.device.applyState(changed);
+  await harness.device.applyState(changed);
+
+  assert.equal(autoFlushCard.triggerCalls.length, 1);
+  assert.equal(harness.triggerCards.get('device_offline').triggerCalls.length, 1);
+  assert.equal(harness.triggerCards.get('filter_low').triggerCalls.length, 1);
+  assert.equal(harness.triggerCards.get('co2_low').triggerCalls.length, 1);
+  assert.equal(harness.loggedErrors.length, 1);
+  assert.equal(harness.loggedErrors[0].message, 'GROHE request failed');
+  assert.equal(harness.loggedErrors[0].message.includes('flow trigger secret'), false);
+});
+
+test('missing percentages do not create duplicate low-level crossings', async () => {
+  const harness = createFlowHarness();
+  await harness.driver.onInit();
+  const normal = {
+    filterPercent: 11,
+    co2Percent: 11,
+    filterLow: false,
+    co2Low: false,
+  };
+  const low = {
+    filterPercent: 10,
+    co2Percent: 9,
+    filterLow: true,
+    co2Low: true,
+  };
+  const missing = {
+    filterPercent: undefined,
+    co2Percent: undefined,
+    filterLow: false,
+    co2Low: false,
+  };
+
+  await harness.device.applyState(normal);
+  await harness.device.applyState(low);
+  await harness.device.applyState(missing);
+  await harness.device.applyState(low);
+
+  assert.equal(harness.triggerCards.get('filter_low').triggerCalls.length, 1);
+  assert.equal(harness.triggerCards.get('co2_low').triggerCalls.length, 1);
+
+  await harness.device.applyState(normal);
+  await harness.device.applyState(low);
+
+  assert.equal(harness.triggerCards.get('filter_low').triggerCalls.length, 2);
+  assert.equal(harness.triggerCards.get('co2_low').triggerCalls.length, 2);
 });

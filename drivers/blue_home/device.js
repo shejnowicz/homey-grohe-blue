@@ -196,7 +196,11 @@ class BlueHomeDevice extends Homey.Device {
     const previousState = this.#previousAppliedState;
     const appliedState = { ...previousState };
     for (const [field, value] of Object.entries(state)) {
-      if (value !== undefined) {
+      const lacksSupportingMeasurement = (
+        (field === 'filterLow' && state.filterPercent === undefined)
+        || (field === 'co2Low' && state.co2Percent === undefined)
+      );
+      if (value !== undefined && !lacksSupportingMeasurement) {
         appliedState[field] = value;
       }
     }
@@ -213,7 +217,7 @@ class BlueHomeDevice extends Homey.Device {
       && state.autoFlush !== previousState.autoFlush
       && this.driver?.autoFlushChangedTrigger
     ) {
-      await this.driver.autoFlushChangedTrigger.trigger(this, {
+      await this.#triggerFlow(this.driver.autoFlushChangedTrigger, {
         enabled: state.autoFlush,
       });
     }
@@ -226,7 +230,7 @@ class BlueHomeDevice extends Homey.Device {
         ? this.driver?.deviceOnlineTrigger
         : this.driver?.deviceOfflineTrigger;
       if (trigger) {
-        await trigger.trigger(this, {});
+        await this.#triggerFlow(trigger, {});
       }
     }
     if (
@@ -234,7 +238,7 @@ class BlueHomeDevice extends Homey.Device {
       && previousState.filterLow === false
       && this.driver?.filterLowTrigger
     ) {
-      await this.driver.filterLowTrigger.trigger(this, {
+      await this.#triggerFlow(this.driver.filterLowTrigger, {
         percentage: state.filterPercent,
         threshold: 10,
       });
@@ -244,10 +248,18 @@ class BlueHomeDevice extends Homey.Device {
       && previousState.co2Low === false
       && this.driver?.co2LowTrigger
     ) {
-      await this.driver.co2LowTrigger.trigger(this, {
+      await this.#triggerFlow(this.driver.co2LowTrigger, {
         percentage: state.co2Percent,
         threshold: 10,
       });
+    }
+  }
+
+  async #triggerFlow(card, tokens) {
+    try {
+      await card.trigger(this, tokens);
+    } catch (error) {
+      this.error(safeError(error));
     }
   }
 
