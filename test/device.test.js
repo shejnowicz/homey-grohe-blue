@@ -66,6 +66,7 @@ function createHarness({
   const unavailableMessages = [];
   const availableCalls = [];
   const loggedErrors = [];
+  const loggedMessages = [];
   const client = {
     async getDashboard() {
       dashboardCalls.push(undefined);
@@ -126,6 +127,9 @@ function createHarness({
   device.error = (error) => {
     loggedErrors.push(error);
   };
+  device.log = (...args) => {
+    loggedMessages.push(args);
+  };
 
   return {
     device,
@@ -141,6 +145,7 @@ function createHarness({
     unavailableMessages,
     availableCalls,
     loggedErrors,
+    loggedMessages,
   };
 }
 
@@ -162,6 +167,40 @@ function dashboardWithConfirmedAutoFlush(active, required, confirmed) {
   appliance.config.flush_confirmed = confirmed;
   return result;
 }
+
+test('logs only changed boolean auto-flush diagnostics without appliance data', async () => {
+  const first = dashboardWithConfirmedAutoFlush(true, true, false);
+  const appliance = first.locations[0].rooms[0].appliances[0];
+  appliance.serial = 'secret-serial';
+  appliance.email = 'secret@example.invalid';
+  const second = structuredClone(first);
+  const third = dashboardWithConfirmedAutoFlush(false, true, false);
+  const responses = [first, second, third];
+  const harness = createHarness({ getDashboard: async () => responses.shift() });
+
+  await harness.device.refreshState();
+  await harness.device.refreshState();
+  await harness.device.refreshState();
+
+  assert.deepEqual(harness.loggedMessages, [
+    ['GROHE auto-flush diagnostic', {
+      active: true,
+      confirmed: false,
+      confirmationRequired: true,
+    }],
+    ['GROHE auto-flush diagnostic', {
+      active: false,
+      confirmed: false,
+      confirmationRequired: true,
+    }],
+  ]);
+  assert.deepEqual(Object.keys(harness.loggedMessages[0][1]).sort(), [
+    'active',
+    'confirmationRequired',
+    'confirmed',
+  ]);
+  assert.equal(JSON.stringify(harness.loggedMessages).includes('secret'), false);
+});
 
 test('initializes with an immediate refresh and a 300-second Homey polling timer', async () => {
   const harness = createHarness();
