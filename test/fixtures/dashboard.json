@@ -33,6 +33,11 @@
               "appliance_id": "non-blue-fixture",
               "name": "A display name that mentions Blue but is not one",
               "type": 103
+            },
+            {
+              "appliance_id": "string-type-fixture",
+              "name": "Unrelated synthetic appliance",
+              "type": "104"
             }
           ]
         }

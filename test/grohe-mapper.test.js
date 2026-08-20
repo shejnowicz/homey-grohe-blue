@@ -12,7 +12,9 @@ const dashboard = JSON.parse(
 const blueHome = dashboard.locations[0].rooms[0].appliances[0];
 
 test('findBlueHomeDevices returns only type 104 appliances with immutable IDs and separate routes', () => {
-  assert.deepEqual(findBlueHomeDevices(dashboard), [{
+  const devices = findBlueHomeDevices(dashboard);
+
+  assert.deepEqual(devices, [{
     id: 'appliance-fixture',
     name: 'Synthetic Blue Home',
     route: {
@@ -23,6 +25,7 @@ test('findBlueHomeDevices returns only type 104 appliances with immutable IDs an
     model: 'Blue Home',
     firmware: '3.2.1',
   }]);
+  assert.equal(devices.some(({ id }) => id === 'string-type-fixture'), false);
 });
 
 test('mapBlueHome maps the latest measurement and configuration state', () => {
@@ -91,4 +94,40 @@ test('mapBlueHome leaves missing measurements absent and does not raise low alar
     filterLow: false,
     co2Low: false,
   });
+});
+
+test('mapBlueHome treats null measurement containers and fields as absent', () => {
+  const expected = {
+    online: false,
+    autoFlush: false,
+    filterPercent: undefined,
+    filterLiters: undefined,
+    co2Percent: undefined,
+    co2Liters: undefined,
+    measurementTimestamp: undefined,
+    idleMinutes: undefined,
+    stillCycles: undefined,
+    carbonatedCycles: undefined,
+    filterLow: false,
+    co2Low: false,
+  };
+
+  for (const dataLatest of [
+    null,
+    { measurement: null },
+    {
+      measurement: {
+        remaining_filter: null,
+        remaining_filter_liters: null,
+        remaining_co2: null,
+        remaining_co2_liters: null,
+        timestamp: null,
+        time_since_last_withdrawal: null,
+        open_close_cycles_still: null,
+        open_close_cycles_carbonated: null,
+      },
+    },
+  ]) {
+    assert.deepEqual(mapBlueHome({ state: 'OFFLINE', data_latest: dataLatest }), expected);
+  }
 });
