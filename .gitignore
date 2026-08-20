@@ -2,4 +2,8 @@
 .superpowers/
 node_modules/
 .homeybuild/
-
+.env
+.env.*
+!.env.example
+env.json
+*.log
