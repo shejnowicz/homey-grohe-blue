@@ -2,7 +2,7 @@
 
 ## Goal
 
-Add the same release model used by the Vasco app: GitHub validates every proposed change, while publishing to the Homey Test channel is performed locally with an already authenticated Homey CLI session.
+Add continuous validation and automatic publication through GitHub Actions. Every proposed change is validated before merge, and every validated app release merged into `main` is uploaded to Homey as a Draft that can be enabled in the Test channel.
 
 ## Continuous integration
 
@@ -18,26 +18,27 @@ The workflow will contain these checks:
 - validate the application at Homey publish level;
 - fail on high-severity production dependency vulnerabilities.
 
-Validation and tests remain independent jobs so failures are easy to identify. GitHub Actions receives no Homey account credentials.
+Validation and tests remain independent jobs so failures are easy to identify. Pull request workflows receive no Homey account credentials.
 
-## Homey Test publication
+## Automatic Homey publication
 
-After CI is green on `main`, run `homey app publish` from the trusted local development machine. Use the existing Homey CLI login and select the Test channel. No OAuth session, refresh token, password, or CLI configuration will be copied into GitHub Secrets.
+After CI is green for a push to `main`, a dependent publish job uses Athom's official `athombv/github-action-homey-app-publish` action. Authentication uses an app-owner Personal Access Token stored only as the protected GitHub Actions secret `HOMEY_PAT`. The token is never available to pull request jobs and is never written to the repository or logs.
 
-Automatic publication from GitHub is outside this scope. It may be added later only if Homey provides a supported non-interactive credential suitable for CI, or through a separately secured self-hosted runner.
+The action uploads the app to Homey Developer Tools as a Draft. The workflow records the returned management URL in its job summary. Uploading a Draft does not publish it to the Live channel; the release is subsequently enabled for Test in Homey Developer Tools.
+
+Each functional release pull request must update the app version and changelog. The publishing job does not create commits or bump versions after merge, avoiding recursive workflow runs and keeping the released version reviewable in the pull request.
 
 ## Delivery flow
 
 1. Create and push the CI change on a branch.
 2. Open a pull request and wait for all new checks to pass.
 3. Merge the pull request into `main`.
-4. Confirm the `main` workflow is green.
-5. Publish the current `main` commit locally to Homey Test.
-6. Verify the Test build is visible and installable through Homey.
+4. The successful `main` workflow automatically uploads the release as a Draft using `HOMEY_PAT`.
+5. Enable the Draft in the Homey Test channel through Homey Developer Tools.
+6. Verify the Test build is visible and installable through its Test URL.
 
-Publishing must stop before any production/live-channel confirmation. A failure at any stage leaves the previous Test build untouched.
+The automation must not submit for certification or publish to the production/Live channel. A failure at any stage leaves the previous Test build untouched.
 
 ## Security and verification
 
-The workflow uses minimal GitHub permissions and does not print or store Homey credentials. Before publication, run the same lint, test, build, and publish-level validation locally. Confirm that the repository contains no generated build directory or authentication material, and inspect the final Git diff before pushing.
-
+The workflow uses minimal GitHub permissions and exposes `HOMEY_PAT` only to the publish job on trusted pushes to `main`. Third-party actions are pinned to immutable commit SHAs where practical. Before publication, run the same lint, test, build, and publish-level validation locally. Confirm that the repository contains no generated build directory or authentication material, and inspect the final Git diff before pushing.
