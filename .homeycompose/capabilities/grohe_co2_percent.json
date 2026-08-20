@@ -1,0 +1,12 @@
+{
+  "type": "number",
+  "title": { "en": "CO₂ remaining", "pl": "Pozostałe CO₂" },
+  "getable": true,
+  "setable": false,
+  "uiComponent": "sensor",
+  "units": { "en": "%", "pl": "%" },
+  "min": 0,
+  "max": 100,
+  "step": 1,
+  "insights": true
+}

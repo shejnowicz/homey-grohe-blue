@@ -1,0 +1,7 @@
+{
+  "type": "boolean",
+  "title": { "en": "Automatic flushing", "pl": "Automatyczne płukanie" },
+  "getable": true,
+  "setable": true,
+  "uiComponent": "toggle"
+}

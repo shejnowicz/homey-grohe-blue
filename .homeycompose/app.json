@@ -1,0 +1,19 @@
+{
+  "id": "com.seweryn.groheblue",
+  "version": "0.0.1",
+  "compatibility": ">=12.9.0",
+  "sdk": 3,
+  "platforms": ["local"],
+  "name": {
+    "en": "GROHE Blue Home",
+    "pl": "GROHE Blue Home"
+  },
+  "description": {
+    "en": "Monitor and control GROHE Blue Home.",
+    "pl": "Monitoruj i steruj GROHE Blue Home."
+  },
+  "author": {
+    "name": "Seweryn Hejnowicz"
+  },
+  "category": ["appliances"]
+}

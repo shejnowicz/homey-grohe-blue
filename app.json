@@ -1,0 +1,251 @@
+{
+  "_comment": "This file is generated. Please edit .homeycompose/app.json instead.",
+  "id": "com.seweryn.groheblue",
+  "version": "0.0.1",
+  "compatibility": ">=12.9.0",
+  "sdk": 3,
+  "platforms": [
+    "local"
+  ],
+  "name": {
+    "en": "GROHE Blue Home",
+    "pl": "GROHE Blue Home"
+  },
+  "description": {
+    "en": "Monitor and control GROHE Blue Home.",
+    "pl": "Monitoruj i steruj GROHE Blue Home."
+  },
+  "author": {
+    "name": "Seweryn Hejnowicz"
+  },
+  "category": [
+    "appliances"
+  ],
+  "drivers": [
+    {
+      "name": {
+        "en": "GROHE Blue Home",
+        "pl": "GROHE Blue Home"
+      },
+      "class": "other",
+      "capabilities": [
+        "grohe_auto_flush",
+        "grohe_online",
+        "grohe_filter_percent",
+        "grohe_co2_percent",
+        "grohe_filter_liters",
+        "grohe_co2_liters",
+        "grohe_measurement_timestamp",
+        "grohe_idle_minutes",
+        "grohe_still_cycles",
+        "grohe_carbonated_cycles",
+        "alarm_grohe_filter_low",
+        "alarm_grohe_co2_low"
+      ],
+      "platforms": [
+        "local"
+      ],
+      "connectivity": [
+        "cloud"
+      ],
+      "images": {
+        "small": "/drivers/blue_home/assets/images/small.png",
+        "large": "/drivers/blue_home/assets/images/large.png",
+        "xlarge": "/drivers/blue_home/assets/images/xlarge.png"
+      },
+      "pair": [
+        {
+          "id": "login_credentials",
+          "navigation": {
+            "next": "list_devices"
+          }
+        },
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "id": "blue_home"
+    }
+  ],
+  "capabilities": {
+    "alarm_grohe_co2_low": {
+      "type": "boolean",
+      "title": {
+        "en": "CO₂ low",
+        "pl": "Niski poziom CO₂"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "alarm_grohe_filter_low": {
+      "type": "boolean",
+      "title": {
+        "en": "Filter low",
+        "pl": "Niski poziom filtra"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "grohe_auto_flush": {
+      "type": "boolean",
+      "title": {
+        "en": "Automatic flushing",
+        "pl": "Automatyczne płukanie"
+      },
+      "getable": true,
+      "setable": true,
+      "uiComponent": "toggle"
+    },
+    "grohe_carbonated_cycles": {
+      "type": "number",
+      "title": {
+        "en": "Carbonated water cycles",
+        "pl": "Cykle wody gazowanej"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "units": {
+        "en": "cycles",
+        "pl": "cykli"
+      },
+      "min": 0,
+      "step": 1,
+      "insights": true
+    },
+    "grohe_co2_liters": {
+      "type": "number",
+      "title": {
+        "en": "CO₂ capacity",
+        "pl": "Pojemność CO₂"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "units": {
+        "en": "L",
+        "pl": "l"
+      },
+      "min": 0,
+      "step": 1,
+      "insights": true
+    },
+    "grohe_co2_percent": {
+      "type": "number",
+      "title": {
+        "en": "CO₂ remaining",
+        "pl": "Pozostałe CO₂"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "units": {
+        "en": "%",
+        "pl": "%"
+      },
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "insights": true
+    },
+    "grohe_filter_liters": {
+      "type": "number",
+      "title": {
+        "en": "Filter capacity",
+        "pl": "Pojemność filtra"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "units": {
+        "en": "L",
+        "pl": "l"
+      },
+      "min": 0,
+      "step": 1,
+      "insights": true
+    },
+    "grohe_filter_percent": {
+      "type": "number",
+      "title": {
+        "en": "Filter remaining",
+        "pl": "Pozostały filtr"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "units": {
+        "en": "%",
+        "pl": "%"
+      },
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "insights": true
+    },
+    "grohe_idle_minutes": {
+      "type": "number",
+      "title": {
+        "en": "Time since last draw",
+        "pl": "Czas od ostatniego pobrania"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "units": {
+        "en": "min",
+        "pl": "min"
+      },
+      "min": 0,
+      "step": 1,
+      "insights": true
+    },
+    "grohe_measurement_timestamp": {
+      "type": "string",
+      "title": {
+        "en": "Last measurement",
+        "pl": "Ostatni pomiar"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "grohe_online": {
+      "type": "boolean",
+      "title": {
+        "en": "Online",
+        "pl": "Online"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "grohe_still_cycles": {
+      "type": "number",
+      "title": {
+        "en": "Still water cycles",
+        "pl": "Cykle wody niegazowanej"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "units": {
+        "en": "cycles",
+        "pl": "cykli"
+      },
+      "min": 0,
+      "step": 1,
+      "insights": true
+    }
+  }
+}

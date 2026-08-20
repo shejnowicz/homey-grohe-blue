@@ -1,0 +1,11 @@
+{
+  "pair": {
+    "login": {
+      "title": "Sign in to GROHE Watersystems",
+      "username": "Email",
+      "password": "Password",
+      "submit": "Sign in",
+      "failed": "Sign-in failed. Check your credentials and try again."
+    }
+  }
+}

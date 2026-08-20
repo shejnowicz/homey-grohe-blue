@@ -1,0 +1,11 @@
+{
+  "type": "number",
+  "title": { "en": "Time since last draw", "pl": "Czas od ostatniego pobrania" },
+  "getable": true,
+  "setable": false,
+  "uiComponent": "sensor",
+  "units": { "en": "min", "pl": "min" },
+  "min": 0,
+  "step": 1,
+  "insights": true
+}

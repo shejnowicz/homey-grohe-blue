@@ -1,0 +1,11 @@
+{
+  "type": "number",
+  "title": { "en": "Carbonated water cycles", "pl": "Cykle wody gazowanej" },
+  "getable": true,
+  "setable": false,
+  "uiComponent": "sensor",
+  "units": { "en": "cycles", "pl": "cykli" },
+  "min": 0,
+  "step": 1,
+  "insights": true
+}

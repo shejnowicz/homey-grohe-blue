@@ -1,0 +1,11 @@
+{
+  "type": "number",
+  "title": { "en": "Still water cycles", "pl": "Cykle wody niegazowanej" },
+  "getable": true,
+  "setable": false,
+  "uiComponent": "sensor",
+  "units": { "en": "cycles", "pl": "cykli" },
+  "min": 0,
+  "step": 1,
+  "insights": true
+}

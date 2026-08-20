@@ -1,0 +1,12 @@
+{
+  "type": "number",
+  "title": { "en": "Filter remaining", "pl": "Pozostały filtr" },
+  "getable": true,
+  "setable": false,
+  "uiComponent": "sensor",
+  "units": { "en": "%", "pl": "%" },
+  "min": 0,
+  "max": 100,
+  "step": 1,
+  "insights": true
+}

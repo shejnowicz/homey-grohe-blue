@@ -1,0 +1,7 @@
+{
+  "type": "boolean",
+  "title": { "en": "CO₂ low", "pl": "Niski poziom CO₂" },
+  "getable": true,
+  "setable": false,
+  "uiComponent": "sensor"
+}

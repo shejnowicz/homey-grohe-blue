@@ -1,0 +1,7 @@
+{
+  "type": "string",
+  "title": { "en": "Last measurement", "pl": "Ostatni pomiar" },
+  "getable": true,
+  "setable": false,
+  "uiComponent": "sensor"
+}

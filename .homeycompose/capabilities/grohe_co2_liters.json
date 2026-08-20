@@ -1,0 +1,11 @@
+{
+  "type": "number",
+  "title": { "en": "CO₂ capacity", "pl": "Pojemność CO₂" },
+  "getable": true,
+  "setable": false,
+  "uiComponent": "sensor",
+  "units": { "en": "L", "pl": "l" },
+  "min": 0,
+  "step": 1,
+  "insights": true
+}

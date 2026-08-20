@@ -1,0 +1,11 @@
+{
+  "pair": {
+    "login": {
+      "title": "Zaloguj się do GROHE Watersystems",
+      "username": "E-mail",
+      "password": "Hasło",
+      "submit": "Zaloguj się",
+      "failed": "Logowanie nie powiodło się. Sprawdź dane i spróbuj ponownie."
+    }
+  }
+}
