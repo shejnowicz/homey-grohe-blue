@@ -9,7 +9,8 @@ const API_BASE = 'https://idp2-apigw.cloud.grohe.com/v3/iot';
 const LOGIN_URL = `${API_BASE}/oidc/login`;
 const REFRESH_URL = `${API_BASE}/oidc/refresh`;
 const DASHBOARD_URL = `${API_BASE}/dashboard`;
-const IDP_BASE = 'https://identity.fixture.invalid';
+const TRUSTED_ORIGIN = 'https://idp2-apigw.cloud.grohe.com';
+const IDP_BASE = TRUSTED_ORIGIN;
 const LOGIN_HTML = fs.readFileSync(path.join(__dirname, 'fixtures/login.html'), 'utf8');
 const DASHBOARD = JSON.parse(
   fs.readFileSync(path.join(__dirname, 'fixtures/dashboard.json'), 'utf8'),
@@ -20,6 +21,14 @@ function jsonResponse(body, init = {}) {
     status: init.status || 200,
     headers: { 'content-type': 'application/json', ...init.headers },
   });
+}
+
+function responseWithCookies(body, { status = 200, headers = {}, cookies = [] } = {}) {
+  const responseHeaders = new Headers(headers);
+  for (const cookie of cookies) {
+    responseHeaders.append('set-cookie', cookie);
+  }
+  return new Response(body, { status, headers: responseHeaders });
 }
 
 function createFetch(sequence) {
@@ -35,19 +44,24 @@ function createFetch(sequence) {
 
 function loginResponses() {
   return [
-    new Response(null, {
+    responseWithCookies(null, {
       status: 302,
       headers: {
-        location: `${IDP_BASE}/authorize`,
-        'set-cookie': 'oidc_state=state-fixture; Path=/; HttpOnly',
+        location: `${IDP_BASE}/v1/sso/auth/authorize`,
       },
+      cookies: [
+        'gateway_api=state-fixture; Path=/v3/iot/; Secure; HttpOnly',
+        'gateway_domain=domain-fixture; Domain=idp2-apigw.cloud.grohe.com; Path=/v3/iot/; Secure',
+        'foreign_domain=foreign-fixture; Domain=untrusted.invalid; Path=/; Secure',
+        'expired_cookie=expired-fixture; Path=/; Max-Age=0',
+      ],
     }),
-    new Response(LOGIN_HTML, {
+    responseWithCookies(LOGIN_HTML, {
       status: 200,
       headers: {
         'content-type': 'text/html',
-        'set-cookie': 'idp_session=session-fixture; Path=/; Secure; HttpOnly',
       },
+      cookies: ['idp_session=session-fixture; Path=/v1/sso/auth/; Secure; HttpOnly'],
     }),
     new Response(null, {
       status: 302,
@@ -79,17 +93,18 @@ test('login discovers the form target, forwards cookies, and exchanges the ondus
   assert.deepEqual(client.getTokens(), tokens);
   assert.equal(calls[0].url, LOGIN_URL);
   assert.equal(calls[0].options.redirect, 'manual');
-  assert.equal(calls[1].url, `${IDP_BASE}/authorize`);
+  assert.equal(calls[1].url, `${IDP_BASE}/v1/sso/auth/authorize`);
   assert.equal(calls[1].options.redirect, 'manual');
 
   assert.equal(
     calls[2].url,
-    `${IDP_BASE}/realms/grohe/login-actions/authenticate?session_code=synthetic-session`,
+    `${IDP_BASE}/v1/sso/auth/realms/grohe/login-actions/authenticate?session_code=synthetic-session`,
   );
   assert.equal(calls[2].options.method, 'POST');
   assert.equal(calls[2].options.redirect, 'manual');
-  assert.equal(calls[2].options.headers.Cookie, 'oidc_state=state-fixture; idp_session=session-fixture');
-  assert.equal(calls[2].options.headers.Referer, `${IDP_BASE}/authorize`);
+  assert.equal(calls[1].options.headers.Cookie, undefined);
+  assert.equal(calls[2].options.headers.Cookie, 'idp_session=session-fixture');
+  assert.equal(calls[2].options.headers.Referer, `${IDP_BASE}/v1/sso/auth/authorize`);
   assert.equal(calls[2].options.body, [
     'execution=synthetic-execution',
     'client_id=synthetic-client',
@@ -102,7 +117,76 @@ test('login discovers the form target, forwards cookies, and exchanges the ondus
     'https://idp2-apigw.cloud.grohe.com/v3/iot/oidc/token?code=synthetic-code',
   );
   assert.equal(calls[3].options.redirect, 'manual');
+  assert.equal(
+    calls[3].options.headers.Cookie,
+    'gateway_api=state-fixture; gateway_domain=domain-fixture',
+  );
 });
+
+for (const location of [
+  'https://untrusted.invalid/collect',
+  'http://idp2-apigw.cloud.grohe.com/v1/sso/auth/authorize',
+]) {
+  test(`login rejects the untrusted redirect ${new URL(location).protocol}`, async () => {
+    const { fetch, calls } = createFetch([
+      new Response(null, {
+        status: 302,
+        headers: {
+          location,
+          'set-cookie': 'gateway_cookie=secret-fixture; Path=/; Secure',
+        },
+      }),
+    ]);
+    const client = new GroheClient({ fetch });
+
+    await assert.rejects(
+      client.login('person@example.invalid', 'password-fixture'),
+      { name: 'GroheProtocolError', message: 'GROHE request failed' },
+    );
+    assert.equal(calls.length, 1);
+  });
+}
+
+test('login rejects an untrusted form action before sending credentials', async () => {
+  const maliciousHtml = LOGIN_HTML.replace(
+    '/v1/sso/auth/realms/grohe/login-actions/authenticate?session_code=synthetic-session',
+    'https://untrusted.invalid/collect',
+  );
+  const { fetch, calls } = createFetch([
+    new Response(null, {
+      status: 302,
+      headers: { location: `${IDP_BASE}/v1/sso/auth/authorize` },
+    }),
+    new Response(maliciousHtml, { status: 200, headers: { 'content-type': 'text/html' } }),
+  ]);
+  const client = new GroheClient({ fetch });
+
+  await assert.rejects(
+    client.login('person@example.invalid', 'password-fixture'),
+    { name: 'GroheProtocolError', message: 'GROHE request failed' },
+  );
+  assert.equal(calls.length, 2);
+  assert.equal(calls.some(({ options }) => String(options.body).includes('password-fixture')), false);
+});
+
+for (const callback of [
+  'ondus://untrusted.invalid/v3/iot/oidc/token?code=synthetic-code',
+  'ondus://idp2-apigw.cloud.grohe.com/v3/iot/other?code=synthetic-code',
+]) {
+  test(`login rejects an untrusted ondus callback ${new URL(callback).hostname}${new URL(callback).pathname}`, async () => {
+    const responses = loginResponses();
+    responses[2] = new Response(null, { status: 302, headers: { location: callback } });
+    responses.length = 3;
+    const { fetch, calls } = createFetch(responses);
+    const client = new GroheClient({ fetch });
+
+    await assert.rejects(
+      client.login('person@example.invalid', 'password-fixture'),
+      { name: 'GroheProtocolError', message: 'GROHE request failed' },
+    );
+    assert.equal(calls.length, 3);
+  });
+}
 
 test('login rejects invalid credentials without exposing them', async () => {
   const responses = loginResponses();
@@ -179,6 +263,33 @@ test('getDashboard refreshes the access token 60 seconds before expiry', async (
   assert.equal(calls[1].options.headers.Authorization, 'Bearer fresh-access-fixture');
 });
 
+test('refreshTokens preserves the previous refresh token when the response omits one', async () => {
+  const { fetch } = createFetch([
+    jsonResponse({
+      access_token: 'fresh-access-fixture',
+      expires_in: 3600,
+      token_type: 'Bearer',
+    }),
+  ]);
+  const client = new GroheClient({
+    fetch,
+    now: () => 10_000,
+    tokens: {
+      access_token: 'stale-access-fixture',
+      refresh_token: 'refresh-fixture',
+      expires_in: 3600,
+      token_type: 'Bearer',
+    },
+  });
+
+  assert.deepEqual(await client.refreshTokens(), {
+    access_token: 'fresh-access-fixture',
+    refresh_token: 'refresh-fixture',
+    expires_in: 3600,
+    token_type: 'Bearer',
+  });
+});
+
 test('concurrent safe GETs share one token refresh', async () => {
   let releaseRefresh;
   const refreshReady = new Promise((resolve) => {
@@ -245,6 +356,36 @@ test('getDashboard refreshes once after a 401 and retries the safe GET once', as
   assert.deepEqual(calls.map(({ url }) => url), [DASHBOARD_URL, REFRESH_URL, DASHBOARD_URL]);
   assert.equal(calls[0].options.headers.Authorization, 'Bearer stale-access-fixture');
   assert.equal(calls[2].options.headers.Authorization, 'Bearer fresh-access-fixture');
+});
+
+test('getDashboard stops after the retried safe GET returns a second 401', async () => {
+  const { fetch, calls } = createFetch([
+    jsonResponse({ errorMessage: 'expired access fixture' }, { status: 401 }),
+    jsonResponse({
+      access_token: 'fresh-access-fixture',
+      refresh_token: 'fresh-refresh-fixture',
+      expires_in: 3600,
+      token_type: 'Bearer',
+    }),
+    jsonResponse({ errorMessage: 'still unauthorized fixture' }, { status: 401 }),
+  ]);
+  const client = new GroheClient({
+    fetch,
+    now: () => 10_000,
+    tokens: {
+      access_token: 'stale-access-fixture',
+      refresh_token: 'refresh-fixture',
+      expires_in: 3600,
+    },
+  });
+
+  await assert.rejects(
+    client.getDashboard(),
+    { name: 'GroheRequestError', message: 'GROHE request failed', status: 401 },
+  );
+  assert.deepEqual(calls.map(({ url }) => url), [DASHBOARD_URL, REFRESH_URL, DASHBOARD_URL]);
+  assert.equal(calls.filter(({ url }) => url === DASHBOARD_URL).length, 2);
+  assert.equal(calls.filter(({ url }) => url === REFRESH_URL).length, 1);
 });
 
 for (const enabled of [true, false]) {
