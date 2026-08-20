@@ -16,7 +16,7 @@ The workflow will contain these checks:
 - build the app with a pinned Homey CLI version;
 - verify that Homey Compose generated files do not introduce an uncommitted `app.json` change;
 - validate the application at Homey publish level;
-- fail on high-severity production dependency vulnerabilities.
+- always report production dependency vulnerabilities and fail on critical-severity findings. The current Homey SDK/CLI dependency tree contains upstream high-severity findings that the application cannot remediate without Athom updates.
 
 Validation and tests remain independent jobs so failures are easy to identify. Pull request workflows receive no Homey account credentials.
 
