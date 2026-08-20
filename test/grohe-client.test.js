@@ -388,8 +388,11 @@ test('getDashboard stops after the retried safe GET returns a second 401', async
   assert.equal(calls.filter(({ url }) => url === REFRESH_URL).length, 1);
 });
 
-for (const enabled of [true, false]) {
-  test(`setAutoFlush sends exactly auto_flush_active=${enabled} to the appliance`, async () => {
+for (const [enabled, expectedConfig] of [
+  [true, { auto_flush_active: true, flush_confirmed: true }],
+  [false, { auto_flush_active: false }],
+]) {
+  test(`setAutoFlush sends the exact ${enabled ? 'enable' : 'disable'} configuration`, async () => {
     const updated = { config: { auto_flush_active: enabled } };
     const { fetch, calls } = createFetch([jsonResponse(updated)]);
     const client = new GroheClient({
@@ -419,7 +422,7 @@ for (const enabled of [true, false]) {
       'Content-Type': 'application/json',
     });
     assert.equal(calls[0].options.body, JSON.stringify({
-      config: { auto_flush_active: enabled, flush_confirmed: enabled },
+      config: expectedConfig,
     }));
   });
 }
