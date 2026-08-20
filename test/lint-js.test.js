@@ -25,16 +25,29 @@ test('lint selection is NUL-safe, excludes generated trees, and checks every sel
   });
 
   assert.deepEqual(calls, [
-    { executable: process.execPath, args: ['--check', 'app.js'], options: { stdio: 'inherit' } },
+    { executable: process.execPath, args: ['--check', '--', 'app.js'], options: { stdio: 'inherit' } },
     {
       executable: process.execPath,
-      args: ['--check', 'drivers/blue_home/device.js'],
+      args: ['--check', '--', 'drivers/blue_home/device.js'],
       options: { stdio: 'inherit' },
     },
     {
       executable: process.execPath,
-      args: ['--check', 'file with spaces.js'],
+      args: ['--check', '--', 'file with spaces.js'],
       options: { stdio: 'inherit' },
     },
   ]);
+});
+
+test('leading-dash filenames are passed after the Node option separator', () => {
+  const calls = [];
+  checkJavaScriptFiles(['--eval=throw-new-Error.js'], (executable, args, options) => {
+    calls.push({ executable, args, options });
+  });
+
+  assert.deepEqual(calls, [{
+    executable: process.execPath,
+    args: ['--check', '--', '--eval=throw-new-Error.js'],
+    options: { stdio: 'inherit' },
+  }]);
 });

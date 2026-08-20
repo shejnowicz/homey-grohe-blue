@@ -14,7 +14,7 @@ function trackedJavaScriptFiles(listFiles = () => execFileSync(
 
 function checkJavaScriptFiles(files, check = execFileSync) {
   for (const file of files) {
-    check(process.execPath, ['--check', file], { stdio: 'inherit' });
+    check(process.execPath, ['--check', '--', file], { stdio: 'inherit' });
   }
 }
 
