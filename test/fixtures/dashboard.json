@@ -10,9 +10,29 @@
               "appliance_id": "appliance-fixture",
               "name": "Synthetic Blue Home",
               "type": 104,
+              "model": "Blue Home",
+              "version": "3.2.1",
+              "state": "ONLINE",
               "config": {
                 "auto_flush_active": true
+              },
+              "data_latest": {
+                "measurement": {
+                  "remaining_filter": 74,
+                  "remaining_filter_liters": 2220,
+                  "remaining_co2": 31,
+                  "remaining_co2_liters": 18,
+                  "timestamp": "2026-08-19T08:15:00.000Z",
+                  "time_since_last_withdrawal": 12,
+                  "open_close_cycles_still": 420,
+                  "open_close_cycles_carbonated": 87
+                }
               }
+            },
+            {
+              "appliance_id": "non-blue-fixture",
+              "name": "A display name that mentions Blue but is not one",
+              "type": 103
             }
           ]
         }
