@@ -49,6 +49,8 @@ function createHarness({
   setCapabilityValue,
   deviceRoute = route,
   autoRunTimeouts = true,
+  language = 'en-GB',
+  timezone = 'UTC',
 } = {}) {
   const Device = loadDevice();
   const device = new Device();
@@ -76,6 +78,8 @@ function createHarness({
   };
 
   device.homey = {
+    i18n: { getLanguage: () => language },
+    clock: { getTimezone: () => timezone },
     app: {
       getClient() {
         return client;
@@ -151,6 +155,14 @@ function dashboardWithAutoFlush(value) {
   return result;
 }
 
+function dashboardWithConfirmedAutoFlush(active, required, confirmed) {
+  const result = dashboardWithAutoFlush(active);
+  const appliance = result.locations[0].rooms[0].appliances[0];
+  appliance.state = { flush_confirmation_required: required };
+  appliance.config.flush_confirmed = confirmed;
+  return result;
+}
+
 test('initializes with an immediate refresh and a 300-second Homey polling timer', async () => {
   const harness = createHarness();
 
@@ -166,7 +178,7 @@ test('initializes with an immediate refresh and a 300-second Homey polling timer
     grohe_co2_percent: 31,
     grohe_filter_liters: 2220,
     grohe_co2_liters: 18,
-    grohe_measurement_timestamp: '2026-08-19T08:15:00.000Z',
+    grohe_measurement_timestamp: '19/08/2026, 08:15',
     grohe_idle_minutes: 12,
     grohe_still_cycles: 420,
     grohe_carbonated_cycles: 87,
@@ -217,7 +229,7 @@ test('applyState preserves last measurements when later mapped values are missin
     grohe_co2_percent: 31,
     grohe_filter_liters: 2220,
     grohe_co2_liters: 18,
-    grohe_measurement_timestamp: '2026-08-19T08:15:00.000Z',
+    grohe_measurement_timestamp: '19/08/2026, 08:15',
     grohe_idle_minutes: 12,
     grohe_still_cycles: 420,
     grohe_carbonated_cycles: 87,
@@ -416,6 +428,30 @@ test('performs at most five confirmation reads two seconds apart and waits for a
     [2_000, 2_000, 2_000, 2_000],
   );
   assert.equal(harness.capabilityValues.get('grohe_auto_flush'), true);
+});
+
+test('waits for effective auto flush confirmation, not merely the active flag', async () => {
+  const responses = [
+    dashboardWithConfirmedAutoFlush(true, true, false),
+    dashboardWithConfirmedAutoFlush(true, true, true),
+  ];
+  const harness = createHarness({ getDashboard: async () => responses.shift() });
+  harness.capabilityValues.set('grohe_auto_flush', false);
+
+  await harness.device.setAutoFlush(true);
+
+  assert.equal(harness.dashboardCalls.length, 2);
+  assert.equal(harness.autoFlushCalls.length, 1);
+  assert.equal(harness.capabilityValues.get('grohe_auto_flush'), true);
+});
+
+test('formats API measurement timestamps for the Homey locale and timezone safely', async () => {
+  const harness = createHarness({ language: 'pl-PL', timezone: 'Europe/Warsaw' });
+  await harness.device.applyState({ measurementTimestamp: '2026-08-20T11:00:00.000Z' });
+  assert.equal(harness.capabilityValues.get('grohe_measurement_timestamp'), '20.08.2026, 13:00');
+
+  await harness.device.applyState({ measurementTimestamp: 'not-a-date' });
+  assert.equal(harness.capabilityValues.get('grohe_measurement_timestamp'), 'not-a-date');
 });
 
 test('rejects after five non-matching confirmations and restores the confirmed state', async () => {

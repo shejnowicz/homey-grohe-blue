@@ -1,6 +1,7 @@
 const Homey = require('homey');
 
 const { mapBlueHome } = require('../../lib/grohe-mapper');
+const { formatMeasurementTimestamp } = require('../../lib/format-measurement-timestamp');
 const { safeError } = require('../../lib/redact');
 
 const POLL_INTERVAL_MS = 300_000;
@@ -155,9 +156,8 @@ class BlueHomeDevice extends Homey.Device {
       throw safeError(error);
     }
 
-    const confirmedAutoFlush = appliance?.config?.auto_flush_active;
-    if (typeof confirmedAutoFlush === 'boolean') {
-      this.#lastConfirmedAutoFlush = confirmedAutoFlush;
+    if (typeof appliance?.config?.auto_flush_active === 'boolean') {
+      this.#lastConfirmedAutoFlush = state.autoFlush;
     }
     try {
       await this.#recordReadSuccess();
@@ -190,7 +190,13 @@ class BlueHomeDevice extends Homey.Device {
     for (const [capability, field] of CAPABILITY_FIELDS) {
       if (state[field] !== undefined) {
         this.#assertActive();
-        await this.setCapabilityValue(capability, state[field]);
+        const value = field === 'measurementTimestamp'
+          ? formatMeasurementTimestamp(state[field], {
+            locale: this.homey.i18n?.getLanguage?.(),
+            timeZone: this.homey.clock?.getTimezone?.(),
+          })
+          : state[field];
+        await this.setCapabilityValue(capability, value);
       }
     }
     const previousState = this.#previousAppliedState;
@@ -287,13 +293,14 @@ class BlueHomeDevice extends Homey.Device {
 
         confirmationReads += 1;
         const { appliance, state } = await this.#fetchState();
-        const confirmedValue = appliance?.config?.auto_flush_active;
-        if (typeof confirmedValue === 'boolean') {
+        const hasConfirmedValue = typeof appliance?.config?.auto_flush_active === 'boolean';
+        const confirmedValue = hasConfirmedValue ? state.autoFlush : undefined;
+        if (hasConfirmedValue) {
           rollbackValue = confirmedValue;
         }
         try {
           await this.applyState(
-            typeof confirmedValue === 'boolean'
+            hasConfirmedValue
               ? state
               : { ...state, autoFlush: undefined },
           );
@@ -328,8 +335,10 @@ class BlueHomeDevice extends Homey.Device {
     let confirmedValue = rollbackValue;
     if (typeof confirmedValue !== 'boolean' && canReadForRecovery) {
       try {
-        const { appliance } = await this.#fetchState();
-        confirmedValue = appliance?.config?.auto_flush_active;
+        const { appliance, state } = await this.#fetchState();
+        confirmedValue = typeof appliance?.config?.auto_flush_active === 'boolean'
+          ? state.autoFlush
+          : undefined;
       } catch (rollbackReadError) {
         if (!this.#disposed) {
           this.error(safeError(rollbackReadError));

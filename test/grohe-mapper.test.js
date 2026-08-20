@@ -45,6 +45,45 @@ test('mapBlueHome maps the latest measurement and configuration state', () => {
   });
 });
 
+test('mapBlueHome maps the production status array and confirmation-gated auto flush', () => {
+  const appliance = {
+    state: { flush_confirmation_required: true },
+    status: [{ type: 'connection', value: 1 }],
+    config: { auto_flush_active: true, flush_confirmed: false },
+  };
+
+  assert.equal(mapBlueHome(appliance).online, true);
+  assert.equal(mapBlueHome(appliance).autoFlush, false);
+  appliance.status[0].value = 0;
+  appliance.config.flush_confirmed = true;
+  assert.equal(mapBlueHome(appliance).online, false);
+  assert.equal(mapBlueHome(appliance).autoFlush, true);
+});
+
+test('production connection status accepts all observed online values', () => {
+  for (const value of [1, true, 'connected']) {
+    assert.equal(mapBlueHome({
+      status: [{ type: 'connection', value }],
+    }).online, true);
+  }
+  assert.equal(mapBlueHome({ status: [{ type: 'connection', value: 0 }] }).online, false);
+});
+
+test('auto flush is effective only when active and any required confirmation is present', () => {
+  for (const [active, required, confirmed, expected] of [
+    [false, false, false, false],
+    [false, true, true, false],
+    [true, false, false, true],
+    [true, true, false, false],
+    [true, true, true, true],
+  ]) {
+    assert.equal(mapBlueHome({
+      state: { flush_confirmation_required: required },
+      config: { auto_flush_active: active, flush_confirmed: confirmed },
+    }).autoFlush, expected);
+  }
+});
+
 test('mapBlueHome preserves zero measurements and applies low alarms at the inclusive threshold', () => {
   const appliance = {
     state: 'OFFLINE',

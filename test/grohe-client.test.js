@@ -419,7 +419,7 @@ for (const enabled of [true, false]) {
       'Content-Type': 'application/json',
     });
     assert.equal(calls[0].options.body, JSON.stringify({
-      config: { auto_flush_active: enabled },
+      config: { auto_flush_active: enabled, flush_confirmed: enabled },
     }));
   });
 }
