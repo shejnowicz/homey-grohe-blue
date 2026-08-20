@@ -54,10 +54,34 @@ jobs:
       - run: npm ci
       - run: npm audit --omit=dev --audit-level=critical
 
+  release:
+    name: Detect versioned release
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.version.outputs.changed }}
+    steps:
+      - name: Check out repository history
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Detect app version change
+        id: version
+        shell: bash
+        run: |
+          before="${{ github.event.before }}"
+          current="$(node -p "require('./.homeycompose/app.json').version")"
+          changed=true
+          if [[ ! "$before" =~ ^0+$ ]] && git cat-file -e "$before:.homeycompose/app.json" 2>/dev/null; then
+            previous="$(git show "$before:.homeycompose/app.json" | node -e "let value=''; process.stdin.on('data', chunk => value += chunk); process.stdin.on('end', () => process.stdout.write(JSON.parse(value).version));")"
+            [[ "$current" != "$previous" ]] || changed=false
+          fi
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+
   publish:
     name: Publish Homey Draft
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [test, homey-validate, dependency-audit]
+    if: needs.release.outputs.changed == 'true'
+    needs: [test, homey-validate, dependency-audit, release]
     runs-on: ubuntu-latest
     environment: homey-test
     steps:
