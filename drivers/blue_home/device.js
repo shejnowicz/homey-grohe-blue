@@ -40,6 +40,12 @@ function confirmationError() {
   return error;
 }
 
+function lifecycleError() {
+  const error = new Error('GROHE request failed');
+  error.name = 'GroheLifecycleError';
+  return error;
+}
+
 class BlueHomeDevice extends Homey.Device {
   #pollTimer;
 
@@ -50,6 +56,12 @@ class BlueHomeDevice extends Homey.Device {
   #availabilityLost = false;
 
   #operationTail = Promise.resolve();
+
+  #disposed = false;
+
+  #pendingDelays = new Set();
+
+  #lastConfirmedAutoFlush;
 
   async onInit() {
     this.registerCapabilityListener(
@@ -68,6 +80,9 @@ class BlueHomeDevice extends Homey.Device {
   }
 
   refreshState() {
+    if (this.#disposed) {
+      return Promise.reject(lifecycleError());
+    }
     if (this.#refreshPromise) {
       return this.#refreshPromise;
     }
@@ -90,38 +105,69 @@ class BlueHomeDevice extends Homey.Device {
   }
 
   #enqueueOperation(operation) {
-    const queued = this.#operationTail.then(operation, operation);
+    if (this.#disposed) {
+      return Promise.reject(lifecycleError());
+    }
+    const run = () => {
+      this.#assertActive();
+      return operation();
+    };
+    const queued = this.#operationTail.then(run, run);
     this.#operationTail = queued.catch(() => undefined);
     return queued;
   }
 
   async #performRefresh() {
-    const { state } = await this.#readAndApplyState();
+    const { state } = await this.#fetchState();
+    this.#assertActive();
+    try {
+      await this.applyState(state);
+    } catch (error) {
+      throw safeError(error);
+    }
     return state;
   }
 
-  async #readAndApplyState() {
+  async #fetchState() {
     let state;
     let appliance;
     try {
+      this.#assertActive();
       const dashboard = await this.homey.app.getClient().getDashboard();
+      this.#assertActive();
       appliance = findAppliance(dashboard, this.getStoreValue('route'));
       if (!appliance) {
         throw missingApplianceError();
       }
 
       state = mapBlueHome(appliance);
-      await this.applyState(state);
     } catch (error) {
-      await this.#recordReadFailure();
+      if (this.#disposed || error?.name === 'GroheLifecycleError') {
+        throw safeError(error);
+      }
+      try {
+        await this.#recordReadFailure();
+      } catch (availabilityError) {
+        this.error(safeError(availabilityError));
+      }
       throw safeError(error);
     }
 
-    await this.#recordReadSuccess();
+    const confirmedAutoFlush = appliance?.config?.auto_flush_active;
+    if (typeof confirmedAutoFlush === 'boolean') {
+      this.#lastConfirmedAutoFlush = confirmedAutoFlush;
+    }
+    try {
+      await this.#recordReadSuccess();
+    } catch (availabilityError) {
+      this.error(safeError(availabilityError));
+    }
+    this.#assertActive();
     return { appliance, state };
   }
 
   async #recordReadFailure() {
+    this.#assertActive();
     this.#readFailures += 1;
     if (this.#readFailures >= 3 && !this.#availabilityLost) {
       await this.setUnavailable('GROHE request failed');
@@ -130,6 +176,7 @@ class BlueHomeDevice extends Homey.Device {
   }
 
   async #recordReadSuccess() {
+    this.#assertActive();
     this.#readFailures = 0;
     if (this.#availabilityLost) {
       await this.setAvailable();
@@ -140,6 +187,7 @@ class BlueHomeDevice extends Homey.Device {
   async applyState(state) {
     for (const [capability, field] of CAPABILITY_FIELDS) {
       if (state[field] !== undefined) {
+        this.#assertActive();
         await this.setCapabilityValue(capability, state[field]);
       }
     }
@@ -151,56 +199,135 @@ class BlueHomeDevice extends Homey.Device {
 
   async #performSetAutoFlush(enabled) {
     const previousValue = this.getCapabilityValue('grohe_auto_flush');
-    let rollbackValue = typeof previousValue === 'boolean' ? previousValue : undefined;
+    let rollbackValue = typeof previousValue === 'boolean'
+      ? previousValue
+      : this.#lastConfirmedAutoFlush;
+    let confirmationReads = 0;
 
     try {
+      this.#assertActive();
       const route = this.getStoreValue('route');
       await this.homey.app.getClient().setAutoFlush(route, enabled);
+      this.#assertActive();
 
       for (let attempt = 0; attempt < CONFIRMATION_READS; attempt += 1) {
         if (attempt > 0) {
           await this.#delay(CONFIRMATION_DELAY_MS);
         }
 
+        confirmationReads += 1;
+        const { appliance, state } = await this.#fetchState();
+        const confirmedValue = appliance?.config?.auto_flush_active;
+        if (typeof confirmedValue === 'boolean') {
+          rollbackValue = confirmedValue;
+        }
         try {
-          const { appliance } = await this.#readAndApplyState();
-          const confirmedValue = appliance?.config?.auto_flush_active;
-          if (typeof confirmedValue === 'boolean') {
-            rollbackValue = confirmedValue;
+          await this.applyState(
+            typeof confirmedValue === 'boolean'
+              ? state
+              : { ...state, autoFlush: undefined },
+          );
+        } catch (applicationError) {
+          if (this.#disposed || applicationError?.name === 'GroheLifecycleError') {
+            throw lifecycleError();
           }
-          if (confirmedValue === enabled) {
-            return;
-          }
-        } catch {
-          // A failed read consumes one confirmation attempt without repeating the PUT.
+          this.error(safeError(applicationError));
+        }
+        this.#assertActive();
+        if (confirmedValue === enabled) {
+          return;
         }
       }
 
       throw confirmationError();
     } catch (error) {
-      if (rollbackValue !== undefined) {
-        try {
-          await this.setCapabilityValue('grohe_auto_flush', rollbackValue);
-        } catch (rollbackError) {
-          throw safeError(rollbackError);
+      const operationError = safeError(error);
+      await this.#restoreAutoFlush(
+        rollbackValue,
+        confirmationReads < CONFIRMATION_READS,
+      );
+      throw operationError;
+    }
+  }
+
+  async #restoreAutoFlush(rollbackValue, canReadForRecovery) {
+    if (this.#disposed) {
+      return;
+    }
+
+    let confirmedValue = rollbackValue;
+    if (typeof confirmedValue !== 'boolean' && canReadForRecovery) {
+      try {
+        const { appliance } = await this.#fetchState();
+        confirmedValue = appliance?.config?.auto_flush_active;
+      } catch (rollbackReadError) {
+        if (!this.#disposed) {
+          this.error(safeError(rollbackReadError));
+        }
+        return;
+      }
+    }
+
+    if (typeof confirmedValue === 'boolean' && !this.#disposed) {
+      try {
+        await this.setCapabilityValue('grohe_auto_flush', confirmedValue);
+      } catch (rollbackError) {
+        if (!this.#disposed) {
+          this.error(safeError(rollbackError));
         }
       }
-      throw safeError(error);
     }
   }
 
   #delay(milliseconds) {
+    this.#assertActive();
     return new Promise((resolve) => {
-      this.homey.setTimeout(resolve, milliseconds);
+      const pending = {
+        settled: false,
+        timer: undefined,
+        settle: undefined,
+      };
+      pending.settle = () => {
+        if (pending.settled) {
+          return;
+        }
+        pending.settled = true;
+        this.#pendingDelays.delete(pending);
+        resolve();
+      };
+      this.#pendingDelays.add(pending);
+      pending.timer = this.homey.setTimeout(pending.settle, milliseconds);
+      if (this.#disposed) {
+        this.homey.clearTimeout(pending.timer);
+        pending.settle();
+      }
     });
   }
 
   onDeleted() {
-    this.#clearPolling();
+    this.#dispose();
   }
 
   onUninit() {
+    this.#dispose();
+  }
+
+  #assertActive() {
+    if (this.#disposed) {
+      throw lifecycleError();
+    }
+  }
+
+  #dispose() {
+    if (this.#disposed) {
+      return;
+    }
+    this.#disposed = true;
     this.#clearPolling();
+    for (const pending of [...this.#pendingDelays]) {
+      this.homey.clearTimeout(pending.timer);
+      pending.settle();
+    }
   }
 
   #clearPolling() {
