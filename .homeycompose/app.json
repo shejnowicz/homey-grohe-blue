@@ -4,6 +4,7 @@
   "compatibility": ">=12.9.0",
   "sdk": 3,
   "platforms": ["local"],
+  "brandColor": "#007E87",
   "name": {
     "en": "GROHE Blue Home",
     "pl": "GROHE Blue Home"
@@ -11,6 +12,11 @@
   "description": {
     "en": "Monitor and control GROHE Blue Home.",
     "pl": "Monitoruj i steruj GROHE Blue Home."
+  },
+  "images": {
+    "small": "/assets/images/small.png",
+    "large": "/assets/images/large.png",
+    "xlarge": "/assets/images/xlarge.png"
   },
   "author": {
     "name": "Seweryn Hejnowicz"
