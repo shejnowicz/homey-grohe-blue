@@ -26,6 +26,16 @@ function loadWithFakeHomey(modulePath) {
   }
 }
 
+function createDeferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
 test('app persists only the refresh token and account identifier', async () => {
   const GroheApp = loadWithFakeHomey('../app');
   const writes = [];
@@ -93,6 +103,180 @@ test('failed token refresh clears the account and requires re-login', async () =
   });
 });
 
+test('startup reconstructs the client from the stored refresh token', async () => {
+  const GroheApp = loadWithFakeHomey('../app');
+  const clientOptions = [];
+  const reconstructedClient = {
+    async refreshTokens() {
+      return { refresh_token: 'stored-refresh-fixture' };
+    },
+  };
+  const app = new GroheApp();
+  app.createGroheClient = (options) => {
+    clientOptions.push(options);
+    return reconstructedClient;
+  };
+  app.homey = {
+    settings: {
+      get() {
+        return {
+          refreshToken: 'stored-refresh-fixture',
+          userId: 'stored@example.invalid',
+        };
+      },
+    },
+  };
+
+  await app.onInit();
+
+  assert.deepEqual(clientOptions, [{
+    tokens: { refresh_token: 'stored-refresh-fixture' },
+  }]);
+  assert.equal(app.getClient(), reconstructedClient);
+});
+
+test('successful token rotation persists the new refresh token', async () => {
+  const GroheApp = loadWithFakeHomey('../app');
+  const writes = [];
+  const rawClient = {
+    async refreshTokens() {
+      return {
+        access_token: 'rotated-access-fixture',
+        refresh_token: 'rotated-refresh-fixture',
+      };
+    },
+  };
+  const app = new GroheApp();
+  app.createGroheClient = () => rawClient;
+  app.homey = {
+    settings: {
+      get() {
+        return {
+          refreshToken: 'stored-refresh-fixture',
+          userId: 'stored@example.invalid',
+        };
+      },
+      set(key, value) {
+        writes.push({ key, value });
+      },
+    },
+  };
+
+  await app.onInit();
+  await app.getClient().refreshTokens();
+
+  assert.deepEqual(writes, [{
+    key: 'account',
+    value: {
+      refreshToken: 'rotated-refresh-fixture',
+      userId: 'stored@example.invalid',
+    },
+  }]);
+});
+
+test('stale refresh success cannot overwrite a newly logged-in account', async () => {
+  const GroheApp = loadWithFakeHomey('../app');
+  const staleRefresh = createDeferred();
+  const writes = [];
+  const clients = [
+    { refreshTokens: () => staleRefresh.promise },
+    { async refreshTokens() { return { refresh_token: 'new-refresh-fixture' }; } },
+  ];
+  const app = new GroheApp();
+  app.createGroheClient = () => clients.shift();
+  app.homey = {
+    settings: {
+      get() {
+        return {
+          refreshToken: 'old-refresh-fixture',
+          userId: 'old@example.invalid',
+        };
+      },
+      set(key, value) {
+        writes.push({ key, value });
+      },
+    },
+  };
+
+  await app.onInit();
+  const oldClient = app.getClient();
+  const staleResult = oldClient.refreshTokens();
+  await app.saveAccount({
+    refreshToken: 'new-refresh-fixture',
+    userId: 'new@example.invalid',
+  });
+  const newClient = app.getClient();
+  staleRefresh.resolve({ refresh_token: 'stale-rotated-fixture' });
+  await staleResult;
+
+  assert.equal(app.getClient(), newClient);
+  assert.deepEqual(app.account, {
+    refreshToken: 'new-refresh-fixture',
+    userId: 'new@example.invalid',
+  });
+  assert.deepEqual(writes, [{
+    key: 'account',
+    value: {
+      refreshToken: 'new-refresh-fixture',
+      userId: 'new@example.invalid',
+    },
+  }]);
+});
+
+test('stale refresh failure cannot delete a newly logged-in account', async () => {
+  const GroheApp = loadWithFakeHomey('../app');
+  const staleRefresh = createDeferred();
+  const writes = [];
+  const removals = [];
+  const clients = [
+    { refreshTokens: () => staleRefresh.promise },
+    { async refreshTokens() { return { refresh_token: 'new-refresh-fixture' }; } },
+  ];
+  const app = new GroheApp();
+  app.createGroheClient = () => clients.shift();
+  app.homey = {
+    settings: {
+      get() {
+        return {
+          refreshToken: 'old-refresh-fixture',
+          userId: 'old@example.invalid',
+        };
+      },
+      set(key, value) {
+        writes.push({ key, value });
+      },
+      unset(key) {
+        removals.push(key);
+      },
+    },
+  };
+
+  await app.onInit();
+  const oldClient = app.getClient();
+  const staleResult = oldClient.refreshTokens();
+  await app.saveAccount({
+    refreshToken: 'new-refresh-fixture',
+    userId: 'new@example.invalid',
+  });
+  const newClient = app.getClient();
+  staleRefresh.reject(new Error('stale refresh failed'));
+  await assert.rejects(staleResult, { name: 'GroheAuthenticationError' });
+
+  assert.equal(app.getClient(), newClient);
+  assert.deepEqual(app.account, {
+    refreshToken: 'new-refresh-fixture',
+    userId: 'new@example.invalid',
+  });
+  assert.deepEqual(removals, []);
+  assert.deepEqual(writes, [{
+    key: 'account',
+    value: {
+      refreshToken: 'new-refresh-fixture',
+      userId: 'new@example.invalid',
+    },
+  }]);
+});
+
 test('pairing uses credentials only for login and returns secret-free device data', async () => {
   const loginCalls = [];
   const storedAccounts = [];
@@ -130,6 +314,10 @@ test('pairing uses credentials only for login and returns secret-free device dat
 
   await driver.onPair(session);
   assert.deepEqual([...handlers.keys()], ['login', 'list_devices']);
+  await assert.rejects(handlers.get('list_devices')(), {
+    name: 'GroheAuthenticationError',
+    message: 'GROHE request failed',
+  });
   assert.equal(await handlers.get('login')({
     username: 'person@example.invalid',
     password: 'password-fixture',
@@ -162,10 +350,20 @@ test('pairing uses credentials only for login and returns secret-free device dat
 });
 
 test('Compose declares credential-first pairing and read-only monitoring capabilities', () => {
+  const appManifest = JSON.parse(fs.readFileSync(
+    path.join(PROJECT_ROOT, '.homeycompose/app.json'),
+    'utf8',
+  ));
   const driver = JSON.parse(fs.readFileSync(
     path.join(PROJECT_ROOT, 'drivers/blue_home/driver.compose.json'),
     'utf8',
   ));
+  assert.equal(appManifest.id, 'com.seweryn.groheblue');
+  assert.equal(appManifest.sdk, 3);
+  assert.deepEqual(appManifest.platforms, ['local']);
+  assert.deepEqual(appManifest.category, ['appliances']);
+  assert.equal(typeof appManifest.brandColor, 'string');
+  assert.deepEqual(Object.keys(appManifest.images).sort(), ['large', 'small', 'xlarge']);
   assert.deepEqual(
     driver.pair.map(({ id }) => id),
     ['login_credentials', 'list_devices', 'add_devices'],
@@ -196,5 +394,21 @@ test('Compose declares credential-first pairing and read-only monitoring capabil
     path.join(PROJECT_ROOT, '.homeycompose/capabilities/grohe_auto_flush.json'),
     'utf8',
   ));
+  assert.equal(autoFlush.getable, true);
   assert.equal(autoFlush.setable, true);
+
+  const readOnlyIds = [
+    'grohe_online',
+    'grohe_measurement_timestamp',
+    'alarm_grohe_filter_low',
+    'alarm_grohe_co2_low',
+  ];
+  for (const id of readOnlyIds) {
+    const capability = JSON.parse(fs.readFileSync(
+      path.join(PROJECT_ROOT, `.homeycompose/capabilities/${id}.json`),
+      'utf8',
+    ));
+    assert.equal(capability.getable, true, id);
+    assert.equal(capability.setable, false, id);
+  }
 });

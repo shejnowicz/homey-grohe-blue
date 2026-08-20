@@ -27,11 +27,12 @@ class GroheBlueApp extends Homey.App {
     return this.client;
   }
 
-  async saveAccount({ refreshToken, userId }) {
+  saveAccount({ refreshToken, userId }) {
     const account = { refreshToken, userId };
-    await Promise.resolve(this.homey.settings.set(ACCOUNT_KEY, account));
+    const client = this.#createAccountClient(account);
+    this.homey.settings.set(ACCOUNT_KEY, account);
     this.account = account;
-    this.client = this.#createAccountClient(account);
+    this.client = client;
   }
 
   #readAccount() {
@@ -60,21 +61,25 @@ class GroheBlueApp extends Homey.App {
     client.refreshTokens = async () => {
       try {
         const tokens = await refreshTokens();
-        if (tokens.refresh_token && tokens.refresh_token !== this.account?.refreshToken) {
+        if (
+          this.client === client
+          && tokens.refresh_token
+          && tokens.refresh_token !== this.account?.refreshToken
+        ) {
           const updatedAccount = {
             refreshToken: tokens.refresh_token,
             userId: account.userId,
           };
-          await Promise.resolve(this.homey.settings.set(ACCOUNT_KEY, updatedAccount));
+          this.homey.settings.set(ACCOUNT_KEY, updatedAccount);
           this.account = updatedAccount;
         }
         return tokens;
       } catch {
-        await Promise.resolve(this.homey.settings.unset(ACCOUNT_KEY));
         if (this.client === client) {
+          this.homey.settings.unset(ACCOUNT_KEY);
           this.client = undefined;
+          this.account = undefined;
         }
-        this.account = undefined;
         throw loginRequiredError();
       }
     };
