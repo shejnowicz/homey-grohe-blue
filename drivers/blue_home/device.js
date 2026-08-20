@@ -63,6 +63,8 @@ class BlueHomeDevice extends Homey.Device {
 
   #lastConfirmedAutoFlush;
 
+  #previousAppliedState;
+
   async onInit() {
     this.registerCapabilityListener(
       'grohe_auto_flush',
@@ -190,6 +192,62 @@ class BlueHomeDevice extends Homey.Device {
         this.#assertActive();
         await this.setCapabilityValue(capability, state[field]);
       }
+    }
+    const previousState = this.#previousAppliedState;
+    const appliedState = { ...previousState };
+    for (const [field, value] of Object.entries(state)) {
+      if (value !== undefined) {
+        appliedState[field] = value;
+      }
+    }
+    this.#previousAppliedState = appliedState;
+    if (previousState) {
+      await this.#triggerStateChanges(previousState, appliedState);
+    }
+  }
+
+  async #triggerStateChanges(previousState, state) {
+    if (
+      typeof state.autoFlush === 'boolean'
+      && typeof previousState.autoFlush === 'boolean'
+      && state.autoFlush !== previousState.autoFlush
+      && this.driver?.autoFlushChangedTrigger
+    ) {
+      await this.driver.autoFlushChangedTrigger.trigger(this, {
+        enabled: state.autoFlush,
+      });
+    }
+    if (
+      typeof state.online === 'boolean'
+      && typeof previousState.online === 'boolean'
+      && state.online !== previousState.online
+    ) {
+      const trigger = state.online
+        ? this.driver?.deviceOnlineTrigger
+        : this.driver?.deviceOfflineTrigger;
+      if (trigger) {
+        await trigger.trigger(this, {});
+      }
+    }
+    if (
+      state.filterLow === true
+      && previousState.filterLow === false
+      && this.driver?.filterLowTrigger
+    ) {
+      await this.driver.filterLowTrigger.trigger(this, {
+        percentage: state.filterPercent,
+        threshold: 10,
+      });
+    }
+    if (
+      state.co2Low === true
+      && previousState.co2Low === false
+      && this.driver?.co2LowTrigger
+    ) {
+      await this.driver.co2LowTrigger.trigger(this, {
+        percentage: state.co2Percent,
+        threshold: 10,
+      });
     }
   }
 

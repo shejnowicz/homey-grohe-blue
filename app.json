@@ -27,6 +27,181 @@
   "category": [
     "appliances"
   ],
+  "flow": {
+    "triggers": [
+      {
+        "id": "auto_flush_changed",
+        "title": {
+          "en": "Automatic flushing changed",
+          "pl": "Automatyczne płukanie zmieniło stan"
+        },
+        "tokens": [
+          {
+            "name": "enabled",
+            "type": "boolean",
+            "title": {
+              "en": "Enabled",
+              "pl": "Włączone"
+            },
+            "example": true
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=blue_home"
+          }
+        ]
+      },
+      {
+        "id": "device_online",
+        "title": {
+          "en": "The device came online",
+          "pl": "Urządzenie przeszło online"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=blue_home"
+          }
+        ]
+      },
+      {
+        "id": "device_offline",
+        "title": {
+          "en": "The device went offline",
+          "pl": "Urządzenie przeszło offline"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=blue_home"
+          }
+        ]
+      },
+      {
+        "id": "filter_low",
+        "title": {
+          "en": "The filter level became low",
+          "pl": "Poziom filtra stał się niski"
+        },
+        "tokens": [
+          {
+            "name": "percentage",
+            "type": "number",
+            "title": {
+              "en": "Filter level",
+              "pl": "Poziom filtra"
+            },
+            "example": 10
+          },
+          {
+            "name": "threshold",
+            "type": "number",
+            "title": {
+              "en": "Low threshold",
+              "pl": "Próg niskiego poziomu"
+            },
+            "example": 10
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=blue_home"
+          }
+        ]
+      },
+      {
+        "id": "co2_low",
+        "title": {
+          "en": "The CO₂ level became low",
+          "pl": "Poziom CO₂ stał się niski"
+        },
+        "tokens": [
+          {
+            "name": "percentage",
+            "type": "number",
+            "title": {
+              "en": "CO₂ level",
+              "pl": "Poziom CO₂"
+            },
+            "example": 10
+          },
+          {
+            "name": "threshold",
+            "type": "number",
+            "title": {
+              "en": "Low threshold",
+              "pl": "Próg niskiego poziomu"
+            },
+            "example": 10
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=blue_home"
+          }
+        ]
+      }
+    ],
+    "conditions": [
+      {
+        "id": "auto_flush_enabled",
+        "title": {
+          "en": "Automatic flushing is enabled",
+          "pl": "Automatyczne płukanie jest włączone"
+        },
+        "titleFormatted": {
+          "en": "Automatic flushing !{{is|isn't}} enabled",
+          "pl": "Automatyczne płukanie !{{jest|nie jest}} włączone"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=blue_home"
+          }
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "id": "enable_auto_flush",
+        "title": {
+          "en": "Enable automatic flushing",
+          "pl": "Włącz automatyczne płukanie"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=blue_home"
+          }
+        ]
+      },
+      {
+        "id": "disable_auto_flush",
+        "title": {
+          "en": "Disable automatic flushing",
+          "pl": "Wyłącz automatyczne płukanie"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=blue_home"
+          }
+        ]
+      }
+    ]
+  },
   "drivers": [
     {
       "name": {
