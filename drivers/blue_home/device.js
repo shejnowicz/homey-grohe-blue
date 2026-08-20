@@ -47,14 +47,6 @@ function lifecycleError() {
   return error;
 }
 
-function autoFlushDiagnostic(appliance) {
-  return {
-    active: appliance?.config?.auto_flush_active === true,
-    confirmed: appliance?.config?.flush_confirmed === true,
-    confirmationRequired: appliance?.state?.flush_confirmation_required === true,
-  };
-}
-
 class BlueHomeDevice extends Homey.Device {
   #pollTimer;
 
@@ -71,8 +63,6 @@ class BlueHomeDevice extends Homey.Device {
   #pendingDelays = new Set();
 
   #lastConfirmedAutoFlush;
-
-  #lastAutoFlushDiagnosticKey;
 
   #previousAppliedState;
 
@@ -154,16 +144,6 @@ class BlueHomeDevice extends Homey.Device {
       }
 
       state = mapBlueHome(appliance);
-      const diagnostic = autoFlushDiagnostic(appliance);
-      const diagnosticKey = [
-        diagnostic.active,
-        diagnostic.confirmed,
-        diagnostic.confirmationRequired,
-      ].join(':');
-      if (diagnosticKey !== this.#lastAutoFlushDiagnosticKey) {
-        this.log('GROHE auto-flush diagnostic', diagnostic);
-        this.#lastAutoFlushDiagnosticKey = diagnosticKey;
-      }
     } catch (error) {
       if (this.#disposed || error?.name === 'GroheLifecycleError') {
         throw safeError(error);

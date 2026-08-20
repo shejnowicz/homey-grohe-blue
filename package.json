@@ -2,6 +2,7 @@
   "name": "homey-grohe-blue",
   "version": "0.0.1",
   "private": true,
+  "license": "MIT",
   "description": "GROHE Blue Home integration for Homey",
   "main": "app.js",
   "engines": {
@@ -9,7 +10,7 @@
   },
   "scripts": {
     "test": "node --test",
-    "lint": "node --check lib/redact.js test/redact.test.js",
+    "lint": "node scripts/lint-js.js",
     "validate": "homey app validate"
   },
   "dependencies": {

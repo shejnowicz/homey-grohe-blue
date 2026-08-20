@@ -26,7 +26,7 @@ Przepływ danych:
 3. `/dashboard` dostarcza lokalizacje, pokoje i urządzenia.
 4. Driver zwraca urządzenia Blue Home z niezmiennym `appliance_id` jako `data.id`.
 5. Device odświeża `/dashboard` co 5 minut i mapuje stan.
-6. Zmiana płukania wykonuje `PUT` zasobu appliance z `{ "config": { "auto_flush_active": boolean } }`, po czym polling potwierdza stan.
+6. Zmiana płukania wykonuje jeden `PUT` zasobu appliance. Włączenie wysyła `{ "config": { "auto_flush_active": true, "flush_confirmed": true } }`; wyłączenie wysyła wyłącznie `{ "config": { "auto_flush_active": false } }`, aby nie cofać istniejącego potwierdzenia. Odczyty po zapisie potwierdzają stan efektywny.
 
 ## Uwierzytelnienie i sekrety
 
@@ -36,16 +36,17 @@ Hasło istnieje wyłącznie w pamięci podczas parowania i nigdy nie jest utrwal
 
 ## Model urządzenia Homey
 
-Standardowe capabilities są używane tam, gdzie semantyka pasuje; pozostałe są capabilities niestandardowymi:
+Wdrożone capabilities niestandardowe:
 
-- `onoff.auto_flush` — automatyczne płukanie,
-- `alarm_generic.connection` — brak łączności,
-- `measure_percentage.filter`, `measure_percentage.co2`,
-- `measure_water.filter_remaining`, `measure_water.co2_remaining`,
-- tekstowe/numeryczne dane diagnostyczne dla ostatniego pomiaru, bezczynności i cykli,
-- `alarm_generic.filter_low`, `alarm_generic.co2_low`.
+- `grohe_auto_flush` — efektywny stan automatycznego płukania,
+- `grohe_online` — stan połączenia,
+- `grohe_filter_percent`, `grohe_co2_percent`,
+- `grohe_filter_liters`, `grohe_co2_liters`,
+- `grohe_measurement_timestamp`, `grohe_idle_minutes`,
+- `grohe_still_cycles`, `grohe_carbonated_cycles`,
+- `alarm_grohe_filter_low`, `alarm_grohe_co2_low`.
 
-Nazwy końcowe capabilities zostaną zweryfikowane przez Homey CLI; własne identyfikatory będą namespacowane, jeśli SDK nie pozwala na warianty standardowych capabilities.
+Stan płukania jest efektywnie włączony, gdy `auto_flush_active` jest `true` oraz — tylko jeśli API jawnie zwraca `flush_confirmation_required: true` — `flush_confirmed` także jest `true`.
 
 ## Flow
 
@@ -67,6 +68,8 @@ Warunek:
 
 Komenda Flow kończy się sukcesem dopiero po potwierdzeniu żądanego stanu przez API. Nie jest automatycznie ponawiana po niejednoznacznym błędzie zapisu.
 
+Każda komenda wykonuje dokładnie jeden PUT. Interfejs Watersystems może pokazywać zbuforowany stan płukania aż do wylogowania i ponownego logowania; źródłem potwierdzenia dla Homey są kolejne odczyty backendu.
+
 ## Polling i błędy
 
 Domyślny polling wynosi 5 minut. Po komendzie wykonywane jest do pięciu odczytów potwierdzających co 2 sekundy. Maksymalnie jedno odświeżenie lub zapis może działać równocześnie dla urządzenia.
@@ -84,6 +87,8 @@ Po trzech kolejnych błędach odczytu urządzenie otrzymuje status unavailable, 
 - Instalacja developerska na wskazanym Homey Pro.
 - Test rzeczywisty: porównanie odczytów z Watersystems oraz włączenie i wyłączenie automatycznego płukania z Homey, z potwierdzeniem API.
 
+Weryfikacja na Homey Pro potwierdziła instalację, pairing, wykrycie urządzenia typu 104, monitoring oraz backendowe włączenie i wyłączenie. Rzeczywiste przekroczenia progów, kontrolowana awaria i ponowne logowanie po wygaśnięciu sesji pozostają niewykonane; są pokryte testami mockowanymi.
+
 ## Kryteria ukończenia
 
-MVP jest ukończone, gdy aplikacja przechodzi testy i walidację, instaluje się na Homey Pro, paruje konto użytkownika, dodaje Blue Home, wyświetla uzgodnione dane oraz dwukierunkowo steruje automatycznym płukaniem przez urządzenie i Flow.
+MVP spełnia kryteria instalacji, pairingu, monitoringu i dwukierunkowego sterowania backendem. Ograniczenie cache interfejsu Watersystems jest udokumentowane; pozostałe niewykonane scenariusze live są jawnie oznaczone w rekordzie weryfikacji.

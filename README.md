@@ -1,16 +1,22 @@
 # GROHE Blue Home for Homey
 
-Developer integration for monitoring and controlling GROHE Blue Home from Homey Pro. The app discovers Blue Home appliances from the GROHE cloud, publishes filter and CO₂ measurements, and controls automatic flushing with API confirmation.
+Developer integration for monitoring and controlling GROHE Blue Home from Homey Pro. The app discovers Blue Home appliances through the GROHE cloud, publishes filter and CO₂ measurements, and controls automatic flushing with API confirmation.
 
 ## Features
 
-- GROHE account pairing through Homey's credential view
-- Online state, filter/CO₂ percentages and remaining liters
-- Last measurement, idle time, and still/carbonated cycle counters
+- GROHE Watersystems account pairing through Homey's credential view
+- Online state, filter/CO₂ percentages, and remaining liters
+- Localized measurement time, idle time, and still/carbonated cycle counters
 - Low filter and CO₂ alarms
 - Confirmed automatic-flushing control from the device and Flow
 - Flow actions, condition, and edge-based state/low-level triggers
 - Five-minute polling with retained measurements and three-failure availability handling
+
+## Verified hardware status
+
+The developer app has been installed and run on an owner-confirmed Homey Pro. A real account paired successfully, a type-104 Blue Home appliance was discovered, and Homey displayed online state, filter/CO₂ percentages and liters, localized timestamp, idle time, and counters. Enable and disable were exercised against the backend and confirmed in Homey; the final state after the owner's last Enable is enabled.
+
+The GROHE Watersystems UI may cache automatic-flushing state until logout/login. Homey therefore confirms writes from subsequent API reads, not from immediate Watersystems UI rendering. Real low-level threshold crossings, controlled outage behavior, and expired-session re-login remain pending; those paths are covered by automated tests only.
 
 ## Local development
 
@@ -18,47 +24,41 @@ Requirements:
 
 - Node.js 22 or newer
 - Homey CLI
-- A Homey Pro running Homey 12.9.0 or newer for the separately authorized live phase
-
-Install dependencies and run local checks:
+- Homey Pro 12.9.0 or newer for live verification
 
 ```sh
 npm install
 npm test
 npm run lint
-homey app validate
+npm run validate
 ```
 
-Never pass a GROHE email, password, token, cookie, appliance identifier, or preshared key as a shell argument or environment assignment. Shell commands are retained in history and may be visible to other processes. Do not place credentials in `.env`, `env.json`, logs, screenshots, issue text, or repository files. Common local secret/log files are ignored as a last line of defense, not as a storage recommendation.
+`npm run lint` syntax-checks every tracked or newly added project JavaScript file while excluding dependency and generated Homey build trees.
 
-Live Homey selection, installation, and pairing must be performed only after confirming the intended hub with its owner. This repository's local verification does not select a hub or contact a real account/device.
+Never pass a GROHE email, password, token, cookie, appliance identifier, or preshared key as a shell argument or environment assignment. Do not place credentials in `.env`, `env.json`, logs, screenshots, issues, or repository files.
 
-## Pairing securely
+## Pairing and re-login
 
-1. In the Homey mobile or web interface, add a device and select GROHE Blue Home.
-2. Enter the GROHE Watersystems account email and password only in Homey's pairing credential view.
-3. Wait for the Blue Home device list, select the intended appliance, and add it.
-4. Verify the device identity and measurements against the GROHE Watersystems app before changing automatic flushing.
+1. Add a device in Homey and select GROHE Blue Home.
+2. Enter the Watersystems account email and password only in Homey's pairing credential view.
+3. Select the intended discovered appliance.
+4. Verify monitoring values before changing automatic flushing.
 
-The password is used only during pairing. The app persists the refresh token and account identifier in Homey's private app settings; it does not store the password or access token in device data/settings.
+The password is used only during pairing. Homey private app settings retain only the refresh token and account identifier. If token refresh fails, repeat the add-device login flow to replace the private session; cancel before adding a duplicate if the appliance is already paired.
 
-## Re-login
+## Automatic-flushing semantics
 
-When token refresh fails, the app removes the stale stored account and reports that GROHE login is required. To authenticate again without putting credentials in a terminal:
+- Enable sends one PUT with `auto_flush_active: true` and `flush_confirmed: true`.
+- Disable sends one PUT with `auto_flush_active: false` and leaves confirmation untouched.
+- If the API explicitly requires confirmation, enabled is effective only when both active and confirmed are true.
+- Ambiguous PUT failures are never retried automatically.
 
-1. Open Homey's add-device flow for GROHE Blue Home.
-2. Enter credentials in the Homey pairing view and continue until the appliance list loads; successful login replaces the private account session.
-3. If the appliance is already paired, cancel before adding a duplicate and refresh the existing device. If Homey does not recover it, remove/re-add only after reviewing dependent Flows and obtaining the owner's approval.
+## Verification and security
 
-## Verification
+The evidence matrix is maintained in [docs/verification/2026-08-19-homey-pro.md](docs/verification/2026-08-19-homey-pro.md).
 
-The local/live evidence matrix is maintained in [docs/verification/2026-08-19-homey-pro.md](docs/verification/2026-08-19-homey-pro.md). PENDING live rows must not be marked PASS without direct, redacted evidence and restoration of the user's original automatic-flushing state.
+- Cloud-operation errors are sanitized.
+- Logs and reports must redact credentials, authorization/cookie headers, tokens, serials, appliance IDs, and preshared keys.
+- Do not commit captures, generated Homey builds, or Homey CLI logs.
 
-## Security
-
-- Errors exposed by cloud operations are sanitized.
-- PUT requests are never automatically retried after ambiguous failure.
-- Logs and bug reports must redact credentials, authorization/cookie headers, tokens, serials, appliance IDs, and preshared keys.
-- Do not commit generated captures or Homey CLI logs.
-
-This is a developer project and has not yet completed the live Homey Pro/device verification phase.
+Licensed under the MIT License. See [LICENSE](LICENSE).

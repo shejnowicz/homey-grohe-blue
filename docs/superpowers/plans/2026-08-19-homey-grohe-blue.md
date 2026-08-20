@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-19-homey-grohe-blue-design.md`
 
+**Shipped/live ruling (2026-08-20):** The implementation uses the custom capability IDs listed in Task 4. Enable sends one PUT with `auto_flush_active: true` and `flush_confirmed: true`; disable sends one PUT with only `auto_flush_active: false`. Effective enabled state requires confirmation only when `flush_confirmation_required` is explicitly true. No PUT retry is allowed. Watersystems may cache the UI state until logout/login, so Homey confirms from backend reads.
+
 ## Global Constraints
 
 - Target Homey Pro using SDK v3 and Node.js 22.
@@ -57,8 +59,8 @@
 - [ ] **Step 3: Implement the minimal OIDC flow** with manual redirects and an in-memory cookie jar; clear the jar and password references after login.
 - [ ] **Step 4: Add failing refresh tests** asserting refresh happens 60 seconds before expiry and one 401 refreshes once before retrying a safe GET.
 - [ ] **Step 5: Implement refresh and authenticated GET** while serializing concurrent refreshes through one shared promise.
-- [ ] **Step 6: Add failing API tests** for `/dashboard` and `PUT /locations/{location}/rooms/{room}/appliances/{appliance}` with exactly `{config:{auto_flush_active:true|false}}`.
-- [ ] **Step 7: Implement dashboard and auto-flush methods**; do not retry PUT after ambiguous network failure.
+- [x] **Step 6: Add API tests** for `/dashboard` and exact asymmetric PUT bodies: enable `{config:{auto_flush_active:true,flush_confirmed:true}}`; disable `{config:{auto_flush_active:false}}`.
+- [x] **Step 7: Implement dashboard and auto-flush methods** with one PUT only; do not retry after ambiguous network failure.
 - [ ] **Step 8: Run `npm test`** and commit with `git commit -m "feat: add GROHE cloud client"`.
 
 ### Task 3: Blue Home discovery and state mapper
@@ -73,6 +75,7 @@
 - Produces `mapBlueHome(appliance): BlueHomeState`.
 - Descriptor fields: `id`, `name`, `route`, `model`, `firmware`.
 - State fields: `online`, `autoFlush`, `filterPercent`, `filterLiters`, `co2Percent`, `co2Liters`, `measurementTimestamp`, `idleMinutes`, `stillCycles`, `carbonatedCycles`, `filterLow`, `co2Low`.
+- Live ruling: status arrays accept connection values `1`, `true`, or `connected`; `autoFlush` requires `flush_confirmed` only when confirmation is explicitly required.
 
 - [ ] **Step 1: Write failing discovery tests** proving only `type: 104` devices are returned and routing IDs are preserved separately from immutable ID.
 - [ ] **Step 2: Run the mapper test** and verify failure.
@@ -162,6 +165,8 @@
 
 ### Task 7: Developer installation and real-device verification
 
+**Live status (2026-08-20):** Steps 3–6 were exercised successfully for hub selection, developer run/install, pairing, type-104 discovery, monitoring, and backend/Homey enable/disable confirmation. Watersystems UI caching requires logout/login to refresh. Step 7 remains mock-only; expired-session re-login and real threshold crossings remain pending. Final owner-requested state is enabled.
+
 **Files:**
 - Create: `README.md`
 - Create: `README.txt`
@@ -173,10 +178,10 @@
 
 - [ ] **Step 1: Document local development** without credentials in command history or repository; include pairing and re-login instructions.
 - [ ] **Step 2: Run `npm test`, `npm run lint`, `homey app validate` and an Aikido scan**; record exact outputs and resolve all actionable findings.
-- [ ] **Step 3: Run `homey select current`** and verify the selected Homey with the user-provided target before any installation.
-- [ ] **Step 4: Install/run the developer app** with Homey CLI and capture logs with secrets redacted.
-- [ ] **Step 5: Pair the GROHE account and Blue Home**; verify online, filter, CO₂, liters, statistics and timestamps against Watersystems/API.
-- [ ] **Step 6: Test auto flush from the device tile and both Flow actions**: enable, confirm API/Homey state, disable, confirm API/Homey state, and restore the user's original state.
+- [x] **Step 3: Run `homey select current`** and verify the selected Homey with the user-provided target before any installation.
+- [x] **Step 4: Install/run the developer app** with Homey CLI; no secret-bearing evidence is retained.
+- [x] **Step 5: Pair the GROHE account and Blue Home**; observe online, filter, CO₂, liters, statistics and localized timestamp without retaining identifiers.
+- [x] **Step 6: Test auto flush against backend/Homey confirmation** in both directions with one PUT each; document Watersystems UI caching and leave the final owner-requested state enabled.
 - [ ] **Step 7: Exercise offline handling** with a mocked/controlled network failure if disrupting the real hub would affect other automations.
 - [ ] **Step 8: Complete the verification matrix** with evidence for each criterion and no stored secrets.
 - [ ] **Step 9: Commit** with `git commit -m "docs: verify GROHE Blue on Homey Pro"`.
