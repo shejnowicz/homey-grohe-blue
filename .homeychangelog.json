@@ -1,4 +1,8 @@
 {
+  "0.0.3": {
+    "en": "Keep the GROHE account connected after temporary network or service errors.",
+    "pl": "Zachowanie połączenia konta GROHE po chwilowych błędach sieci lub usługi."
+  },
   "0.0.2": {
     "en": "Keep the GROHE account connected after temporary network or service errors.",
     "pl": "Zachowanie połączenia konta GROHE po chwilowych błędach sieci lub usługi."
