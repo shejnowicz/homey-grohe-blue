@@ -66,12 +66,15 @@ test('app persists only the refresh token and account identifier', async () => {
   assert.equal(JSON.stringify(writes).includes('access-fixture'), false);
 });
 
-test('failed token refresh clears the account and requires re-login', async () => {
+test('authenticated token refresh failure clears the account and requires re-login', async () => {
   const GroheApp = loadWithFakeHomey('../app');
   const removals = [];
   const rawClient = {
     async refreshTokens() {
-      throw new Error('refresh-fixture must not escape');
+      const error = new Error('refresh-fixture must not escape');
+      error.name = 'GroheAuthenticationError';
+      error.status = 401;
+      throw error;
     },
   };
   const app = new GroheApp();
@@ -100,6 +103,57 @@ test('failed token refresh clears the account and requires re-login', async () =
   assert.throws(() => app.getClient(), {
     name: 'GroheAuthenticationError',
     message: 'GROHE login required',
+  });
+});
+
+test('transient token refresh failures preserve the account for automatic retry', async () => {
+  const GroheApp = loadWithFakeHomey('../app');
+  const removals = [];
+  let attempt = 0;
+  const rawClient = {
+    async refreshTokens() {
+      attempt += 1;
+      if (attempt === 2) {
+        throw new TypeError('network details must not escape');
+      }
+      const error = new Error('upstream response must not escape');
+      error.name = 'GroheRequestError';
+      error.status = 503;
+      throw error;
+    },
+  };
+  const app = new GroheApp();
+  app.createGroheClient = () => rawClient;
+  app.homey = {
+    settings: {
+      get() {
+        return {
+          refreshToken: 'refresh-fixture',
+          userId: 'person@example.invalid',
+        };
+      },
+      unset(key) {
+        removals.push(key);
+      },
+    },
+  };
+
+  await app.onInit();
+  const client = app.getClient();
+  await assert.rejects(client.refreshTokens(), {
+    name: 'GroheRequestError',
+    message: 'GROHE request failed',
+    status: 503,
+  });
+  await assert.rejects(client.refreshTokens(), {
+    name: 'TypeError',
+    message: 'GROHE request failed',
+  });
+  assert.deepEqual(removals, []);
+  assert.equal(app.getClient(), client);
+  assert.deepEqual(app.account, {
+    refreshToken: 'refresh-fixture',
+    userId: 'person@example.invalid',
   });
 });
 
@@ -259,7 +313,10 @@ test('stale refresh failure cannot delete a newly logged-in account', async () =
     userId: 'new@example.invalid',
   });
   const newClient = app.getClient();
-  staleRefresh.reject(new Error('stale refresh failed'));
+  const staleError = new Error('stale refresh failed');
+  staleError.name = 'GroheAuthenticationError';
+  staleError.status = 401;
+  staleRefresh.reject(staleError);
   await assert.rejects(staleResult, { name: 'GroheAuthenticationError' });
 
   assert.equal(app.getClient(), newClient);
