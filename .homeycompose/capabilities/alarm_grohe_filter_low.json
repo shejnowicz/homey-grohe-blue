@@ -3,5 +3,8 @@
   "title": { "en": "Filter low", "pl": "Niski poziom filtra" },
   "getable": true,
   "setable": false,
-  "uiComponent": "sensor"
+  "uiComponent": "sensor",
+  "insights": true,
+  "insightsTitleTrue": { "en": "Filter ran low", "pl": "Filtr na wyczerpaniu" },
+  "insightsTitleFalse": { "en": "Filter level OK", "pl": "Filtr w normie" }
 }
