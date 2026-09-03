@@ -1,4 +1,8 @@
 {
+  "0.0.4": {
+    "en": "Add Insights history for low CO₂, low filter, and connectivity events.",
+    "pl": "Dodano historię Insights dla niskiego poziomu CO₂, filtra i zmian łączności."
+  },
   "0.0.3": {
     "en": "Keep the GROHE account connected after temporary network or service errors.",
     "pl": "Zachowanie połączenia konta GROHE po chwilowych błędach sieci lub usługi."

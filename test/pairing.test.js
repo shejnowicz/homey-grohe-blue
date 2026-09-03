@@ -468,4 +468,21 @@ test('Compose declares credential-first pairing and read-only monitoring capabil
     assert.equal(capability.getable, true, id);
     assert.equal(capability.setable, false, id);
   }
+
+  const booleanInsightIds = [
+    'grohe_online',
+    'alarm_grohe_filter_low',
+    'alarm_grohe_co2_low',
+  ];
+  for (const id of booleanInsightIds) {
+    const capability = JSON.parse(fs.readFileSync(
+      path.join(PROJECT_ROOT, `.homeycompose/capabilities/${id}.json`),
+      'utf8',
+    ));
+    assert.equal(capability.insights, true, id);
+    assert.equal(typeof capability.insightsTitleTrue?.en, 'string', id);
+    assert.equal(typeof capability.insightsTitleTrue?.pl, 'string', id);
+    assert.equal(typeof capability.insightsTitleFalse?.en, 'string', id);
+    assert.equal(typeof capability.insightsTitleFalse?.pl, 'string', id);
+  }
 });
