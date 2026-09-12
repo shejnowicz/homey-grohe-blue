@@ -1,9 +1,11 @@
 {
   "id": "com.seweryn.groheblue",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "compatibility": ">=12.9.0",
   "sdk": 3,
-  "platforms": ["local"],
+  "platforms": [
+    "local"
+  ],
   "brandColor": "#007E87",
   "name": {
     "en": "GROHE Blue Home",
@@ -21,5 +23,7 @@
   "author": {
     "name": "Seweryn Hejnowicz"
   },
-  "category": ["appliances"]
+  "category": [
+    "appliances"
+  ]
 }
