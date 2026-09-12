@@ -14,5 +14,9 @@
   "0.0.1": {
     "en": "Initial Test release with GROHE Blue Home monitoring and automatic flushing controls.",
     "pl": "Pierwsza wersja testowa z monitorowaniem GROHE Blue Home i sterowaniem automatycznym płukaniem."
+  },
+  "0.0.5": {
+    "en": "Show the CO₂ level on the device tile by default.",
+    "pl": "Kafelek urządzenia domyślnie pokazuje poziom CO₂."
   }
 }

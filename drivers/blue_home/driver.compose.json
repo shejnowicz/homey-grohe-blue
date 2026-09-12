@@ -5,10 +5,10 @@
   },
   "class": "other",
   "capabilities": [
+    "grohe_co2_percent",
     "grohe_auto_flush",
     "grohe_online",
     "grohe_filter_percent",
-    "grohe_co2_percent",
     "grohe_filter_liters",
     "grohe_co2_liters",
     "grohe_measurement_timestamp",
@@ -18,8 +18,12 @@
     "alarm_grohe_filter_low",
     "alarm_grohe_co2_low"
   ],
-  "platforms": ["local"],
-  "connectivity": ["cloud"],
+  "platforms": [
+    "local"
+  ],
+  "connectivity": [
+    "cloud"
+  ],
   "images": {
     "small": "/drivers/blue_home/assets/images/small.png",
     "large": "/drivers/blue_home/assets/images/large.png",
@@ -28,12 +32,16 @@
   "pair": [
     {
       "id": "login_credentials",
-      "navigation": { "next": "list_devices" }
+      "navigation": {
+        "next": "list_devices"
+      }
     },
     {
       "id": "list_devices",
       "template": "list_devices",
-      "navigation": { "next": "add_devices" }
+      "navigation": {
+        "next": "add_devices"
+      }
     },
     {
       "id": "add_devices",
