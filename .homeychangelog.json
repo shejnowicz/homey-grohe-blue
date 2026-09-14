@@ -1,4 +1,8 @@
 {
+  "0.0.6": {
+    "en": "New app icon: a sparkling glass instead of the generic water drop.",
+    "pl": "Nowa ikona aplikacji: szklanka z bąbelkami zamiast ogólnej kropli wody."
+  },
   "0.0.4": {
     "en": "Add Insights history for low CO₂, low filter, and connectivity events.",
     "pl": "Dodano historię Insights dla niskiego poziomu CO₂, filtra i zmian łączności."
