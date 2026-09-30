@@ -825,3 +825,102 @@ test('rollback setter failure does not mask the original sanitized operation err
   assert.equal(harness.loggedErrors.length, 1);
   assert.equal(harness.loggedErrors[0].message, 'GROHE request failed');
 });
+
+test('an authentication failure names the repair action while other failures stay generic', async () => {
+  const authenticationHarness = createHarness({
+    getDashboard: async () => {
+      const error = new Error('token secret must not escape');
+      error.name = 'GroheAuthenticationError';
+      throw error;
+    },
+  });
+  const genericHarness = createHarness({
+    getDashboard: async () => {
+      throw new Error('transport secret must not escape');
+    },
+  });
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await assert.rejects(authenticationHarness.device.refreshState());
+    await assert.rejects(genericHarness.device.refreshState());
+  }
+
+  assert.deepEqual(
+    authenticationHarness.unavailableMessages,
+    ['GROHE login required — repair this device'],
+  );
+  assert.deepEqual(genericHarness.unavailableMessages, ['GROHE request failed']);
+  assert.notEqual(
+    authenticationHarness.unavailableMessages[0],
+    genericHarness.unavailableMessages[0],
+  );
+  assert.equal(
+    authenticationHarness.unavailableMessages[0].includes('token secret'),
+    false,
+  );
+});
+
+test('a rejected credential status also points at the repair action', async () => {
+  const harness = createHarness({
+    getDashboard: async () => {
+      const error = new Error('upstream secret must not escape');
+      error.name = 'GroheRequestError';
+      error.status = 401;
+      throw error;
+    },
+  });
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await assert.rejects(harness.device.refreshState());
+  }
+
+  assert.deepEqual(
+    harness.unavailableMessages,
+    ['GROHE login required — repair this device'],
+  );
+});
+
+test('onAccountRepaired reads immediately and restores availability', async () => {
+  let repaired = false;
+  const harness = createHarness({
+    getDashboard: async () => {
+      if (!repaired) {
+        const error = new Error('token secret must not escape');
+        error.name = 'GroheAuthenticationError';
+        throw error;
+      }
+      return dashboard;
+    },
+  });
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await assert.rejects(harness.device.refreshState());
+  }
+  assert.deepEqual(
+    harness.unavailableMessages,
+    ['GROHE login required — repair this device'],
+  );
+  assert.equal(harness.availableCalls.length, 0);
+
+  repaired = true;
+  await harness.device.onAccountRepaired();
+
+  assert.equal(harness.dashboardCalls.length, 4);
+  assert.equal(harness.availableCalls.length, 1);
+  assert.equal(harness.capabilityValues.get('grohe_co2_percent'), 31);
+});
+
+test('onAccountRepaired logs a failed recovery read instead of rejecting the repair', async () => {
+  const harness = createHarness({
+    getDashboard: async () => {
+      throw new Error('recovery secret must not escape');
+    },
+  });
+
+  await harness.device.onAccountRepaired();
+
+  assert.equal(harness.dashboardCalls.length, 1);
+  assert.equal(harness.availableCalls.length, 0);
+  assert.equal(harness.loggedErrors.length, 1);
+  assert.equal(harness.loggedErrors[0].message, 'GROHE request failed');
+});
