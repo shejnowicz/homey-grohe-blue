@@ -1,4 +1,12 @@
 {
+  "0.0.8": {
+    "en": "Repair a device by signing in to GROHE again, without removing and re-adding it.",
+    "pl": "Naprawa urządzenia przez ponowne zalogowanie do GROHE, bez usuwania i dodawania go na nowo."
+  },
+  "0.0.7": {
+    "en": "New app icon: a sparkling glass instead of the generic water drop.",
+    "pl": "Nowa ikona aplikacji: szklanka z bąbelkami zamiast ogólnej kropli wody."
+  },
   "0.0.4": {
     "en": "Add Insights history for low CO₂, low filter, and connectivity events.",
     "pl": "Dodano historię Insights dla niskiego poziomu CO₂, filtra i zmian łączności."

@@ -66,6 +66,31 @@ class BlueHomeDriver extends Homey.Driver {
       }
     });
   }
+
+  async onRepair(session, device) {
+    session.setHandler('login', async ({ username, password }) => {
+      try {
+        const client = this.createPairingClient();
+        const tokens = await client.login(username, password);
+        await this.homey.app.saveAccount({
+          refreshToken: tokens.refresh_token,
+          userId: username,
+        });
+      } catch (error) {
+        throw safeError(error);
+      }
+
+      // The account is stored at this point, so the repair itself succeeded.
+      // Recovery only shortens the wait for the next poll, so a failure here is
+      // logged rather than reported as a failed sign-in.
+      try {
+        await device.onAccountRepaired();
+      } catch (error) {
+        this.error(safeError(error));
+      }
+      return true;
+    });
+  }
 }
 
 module.exports = BlueHomeDriver;
