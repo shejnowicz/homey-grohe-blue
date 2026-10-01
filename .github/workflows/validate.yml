@@ -84,12 +84,96 @@ jobs:
     needs: [test, homey-validate, dependency-audit, release]
     runs-on: ubuntu-latest
     environment: homey-test
+    # The workflow default is read-only; this job also opens the promotion
+    # reminder issue, so it asks for issue write access and nothing else.
+    permissions:
+      contents: read
+      issues: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Read the app version
+        id: app
+        shell: bash
+        run: |
+          echo "version=$(node -p "require('./.homeycompose/app.json').version")" >> "$GITHUB_OUTPUT"
       - name: Publish Draft
         id: publish
         uses: athombv/github-action-homey-app-publish@0642b483f1eb66fbceb0c91b73df35d45fd2f3db
         with:
           personal_access_token: ${{ secrets.HOMEY_PAT }}
-      - name: Add management URL to summary
-        run: echo "Manage the Homey Draft at ${{ steps.publish.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"
+      # The Athom action only creates a DRAFT. Promoting that draft to the Test
+      # channel is a manual click in the Homey Developer Tools - neither the
+      # Homey CLI nor any Athom action can do it - so the steps below make sure
+      # a waiting draft is impossible to miss.
+      - name: Summarise the waiting draft
+        shell: bash
+        env:
+          VERSION: ${{ steps.app.outputs.version }}
+          DRAFT_URL: ${{ steps.publish.outputs.url }}
+        run: |
+          {
+            echo "### Homey draft ${VERSION} is waiting for promotion"
+            echo
+            echo "- Version: ${VERSION}"
+            echo "- Management page: ${DRAFT_URL}"
+            echo
+            echo "Open the management page and promote this draft to the Test channel; Athom offers no API or CLI for that step."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Open a promotion reminder issue
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          VERSION: ${{ steps.app.outputs.version }}
+          DRAFT_URL: ${{ steps.publish.outputs.url }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          gh label create release --repo "${REPOSITORY}" --color 0E8A16 \
+            --description "Release and publication chores" || true
+          body="${RUNNER_TEMP:-.}/promote-issue.md"
+          cat > "${body}" <<EOF
+          A new Homey draft of GROHE Blue is waiting in the Homey Developer Tools.
+
+          - Version: ${VERSION}
+          - Management page: ${DRAFT_URL}
+          - Commit: ${COMMIT_SHA}
+
+          Open the management page and promote this draft to the Test channel, then close this issue.
+          EOF
+          # Best effort: a missing issue must not fail a successful publish.
+          gh issue create --repo "${REPOSITORY}" \
+            --title "Promote GROHE Blue ${VERSION} to Test" \
+            --label release \
+            --body-file "${body}" \
+            || echo "::warning::Could not open the promotion reminder issue; promote ${VERSION} by hand at ${DRAFT_URL}"
+      # Optional phone push. The matching Homey flow is
+      # "GROHE — wersja robocza czeka na promocję (webhook)", listening on the
+      # event `grohe-draft`. The HOMEY_WEBHOOK_URL secret holds the full
+      # https://webhooks.athom.com/webhook/<id> base URL - it is a secret because
+      # anyone holding it can fire the flow, so it never appears in the repository.
+      # Without the secret the push step is skipped and nothing else changes.
+      - name: Check the optional Homey webhook secret
+        id: homey_push
+        shell: bash
+        env:
+          HOMEY_WEBHOOK_URL: ${{ secrets.HOMEY_WEBHOOK_URL }}
+        run: |
+          if [ -n "${HOMEY_WEBHOOK_URL}" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "No HOMEY_WEBHOOK_URL secret configured; skipping the Homey push."
+          fi
+      - name: Push the draft notice to Homey
+        if: steps.homey_push.outputs.configured == 'true'
+        shell: bash
+        env:
+          HOMEY_WEBHOOK_URL: ${{ secrets.HOMEY_WEBHOOK_URL }}
+          VERSION: ${{ steps.app.outputs.version }}
+          DRAFT_URL: ${{ steps.publish.outputs.url }}
+        run: |
+          curl --silent --show-error --max-time 20 --get \
+            --data-urlencode "event=grohe-draft" \
+            --data-urlencode "tag=${VERSION} ${DRAFT_URL}" \
+            --output /dev/null \
+            "${HOMEY_WEBHOOK_URL}" || true
