@@ -1,0 +1,11 @@
+.github/
+.homeybuild/
+docs/
+test/
+scripts/
+.gitignore
+.homeyignore
+package-lock.json
+LICENSE
+README.md
+README.txt

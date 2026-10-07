@@ -13,7 +13,7 @@
     "lint": "node scripts/lint-js.js",
     "validate": "homey app validate"
   },
-  "dependencies": {
+  "devDependencies": {
     "homey": "^3.0.0"
   }
 }
