@@ -7,5 +7,11 @@
       "submit": "Sign in",
       "failed": "Sign-in failed. Check your credentials and try again."
     }
+  },
+  "repair": {
+    "login": {
+      "title": "Sign in to GROHE again",
+      "hint": "The saved GROHE sign-in is no longer accepted. Sign in again to reconnect this device — you do not have to remove and add it."
+    }
   }
 }

@@ -3,5 +3,8 @@
   "title": { "en": "Online", "pl": "Online" },
   "getable": true,
   "setable": false,
-  "uiComponent": "sensor"
+  "uiComponent": "sensor",
+  "insights": true,
+  "insightsTitleTrue": { "en": "Came online", "pl": "Połączono" },
+  "insightsTitleFalse": { "en": "Went offline", "pl": "Utracono połączenie" }
 }

@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Use Node.js 22.
-- Run `npm ci`, `npm run lint`, `npm test`, Homey publish-level validation, and `npm audit --omit=dev --audit-level=high`.
+- Run `npm ci`, `npm run lint`, `npm test`, Homey publish-level validation, and `npm audit --omit=dev --audit-level=critical` so all findings are reported while critical findings block delivery.
 - Pull request jobs must not receive Homey credentials.
 - Expose `HOMEY_PAT` only to the publish job on trusted pushes to `main`.
 - Upload only a Draft; do not submit for certification or publish to Live.
@@ -100,7 +100,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm audit --omit=dev --audit-level=high
+      - run: npm audit --omit=dev --audit-level=critical
 ```
 
 - [ ] **Step 3: Verify local equivalents of all CI checks**
@@ -114,7 +114,7 @@ npm test
 homey app build
 git diff --exit-code -- app.json
 homey app validate --level publish
-npm audit --omit=dev --audit-level=high
+npm audit --omit=dev --audit-level=critical
 ```
 
 Expected: every command exits zero; tests report 77 passing tests; `app.json` remains unchanged.
@@ -275,4 +275,3 @@ Expected: all validation jobs and `Publish Homey Draft` pass; the job summary co
 - [ ] **Step 7: Enable and test the Draft**
 
 Open the management URL from the job summary, enable version `0.0.1` for Test, then install it through its Homey Test URL. Confirm pairing, status refresh, and both automatic-flushing Flow cards. Do not submit the app for certification and do not publish it to Live.
-

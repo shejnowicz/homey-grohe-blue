@@ -8,6 +8,9 @@ const POLL_INTERVAL_MS = 300_000;
 const CONFIRMATION_DELAY_MS = 2_000;
 const CONFIRMATION_READS = 5;
 
+const UNAVAILABLE_MESSAGE = 'GROHE request failed';
+const UNAVAILABLE_AUTHENTICATION_MESSAGE = 'GROHE login required — repair this device';
+
 const CAPABILITY_FIELDS = [
   ['grohe_auto_flush', 'autoFlush'],
   ['grohe_online', 'online'],
@@ -27,6 +30,14 @@ function findAppliance(dashboard, route) {
   const location = dashboard?.locations?.find(({ id }) => id === route?.locationId);
   const room = location?.rooms?.find(({ id }) => id === route?.roomId);
   return room?.appliances?.find(({ appliance_id: id }) => id === route?.applianceId);
+}
+
+// Mirrors the predicate the app uses when a token refresh is rejected: the
+// stored credentials are gone or refused, so only a new sign-in helps.
+function isAuthenticationFailure(error) {
+  return error?.name === 'GroheAuthenticationError'
+    || error?.status === 401
+    || error?.status === 403;
 }
 
 function missingApplianceError() {
@@ -107,6 +118,23 @@ class BlueHomeDevice extends Homey.Device {
     return refreshPromise;
   }
 
+  /**
+   * Called by the driver once a repair session has signed in to GROHE again.
+   * Reads the device with the freshly stored account so it comes back right
+   * away instead of staying unavailable until the next poll, up to five
+   * minutes later. A failure here is logged, not thrown: the account is
+   * already saved, the repair succeeded, and polling keeps retrying. The read
+   * is queued directly rather than through refreshState() so it cannot join a
+   * request that is still in flight with the rejected account.
+   */
+  async onAccountRepaired() {
+    try {
+      await this.#enqueueOperation(() => this.#performRefresh());
+    } catch (error) {
+      this.error(safeError(error));
+    }
+  }
+
   #enqueueOperation(operation) {
     if (this.#disposed) {
       return Promise.reject(lifecycleError());
@@ -149,7 +177,7 @@ class BlueHomeDevice extends Homey.Device {
         throw safeError(error);
       }
       try {
-        await this.#recordReadFailure();
+        await this.#recordReadFailure(error);
       } catch (availabilityError) {
         this.error(safeError(availabilityError));
       }
@@ -168,11 +196,15 @@ class BlueHomeDevice extends Homey.Device {
     return { appliance, state };
   }
 
-  async #recordReadFailure() {
+  async #recordReadFailure(error) {
     this.#assertActive();
     this.#readFailures += 1;
     if (this.#readFailures >= 3 && !this.#availabilityLost) {
-      await this.setUnavailable('GROHE request failed');
+      await this.setUnavailable(
+        isAuthenticationFailure(error)
+          ? UNAVAILABLE_AUTHENTICATION_MESSAGE
+          : UNAVAILABLE_MESSAGE,
+      );
       this.#availabilityLost = true;
     }
   }

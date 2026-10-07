@@ -1,6 +1,7 @@
 const Homey = require('homey');
 
 const { GroheClient } = require('./lib/grohe-client');
+const { safeError } = require('./lib/redact');
 
 const ACCOUNT_KEY = 'account';
 
@@ -74,13 +75,22 @@ class GroheBlueApp extends Homey.App {
           this.account = updatedAccount;
         }
         return tokens;
-      } catch {
-        if (this.client === client) {
+      } catch (error) {
+        const authenticationFailed = error?.name === 'GroheAuthenticationError'
+          || error?.status === 401
+          || error?.status === 403;
+
+        if (authenticationFailed && this.client === client) {
           this.homey.settings.unset(ACCOUNT_KEY);
           this.client = undefined;
           this.account = undefined;
         }
-        throw loginRequiredError();
+
+        if (authenticationFailed) {
+          throw loginRequiredError();
+        }
+
+        throw safeError(error);
       }
     };
 

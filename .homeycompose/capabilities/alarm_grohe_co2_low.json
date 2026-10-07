@@ -3,5 +3,8 @@
   "title": { "en": "CO₂ low", "pl": "Niski poziom CO₂" },
   "getable": true,
   "setable": false,
-  "uiComponent": "sensor"
+  "uiComponent": "sensor",
+  "insights": true,
+  "insightsTitleTrue": { "en": "CO₂ ran low", "pl": "CO₂ na wyczerpaniu" },
+  "insightsTitleFalse": { "en": "CO₂ level OK", "pl": "Poziom CO₂ w normie" }
 }
