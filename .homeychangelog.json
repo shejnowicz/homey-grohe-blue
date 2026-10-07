@@ -26,5 +26,9 @@
   "0.0.5": {
     "en": "Show the CO₂ level on the device tile by default.",
     "pl": "Kafelek urządzenia domyślnie pokazuje poziom CO₂."
+  },
+  "0.0.9": {
+    "en": "Much smaller app download. No change to how the app works.",
+    "pl": "Znacznie mniejszy rozmiar pobieranej aplikacji. Bez zmian w działaniu."
   }
 }
